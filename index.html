@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>สงครามโคตรเสียว</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="music-widget">
+    <label for="musicVolume">เพลง</label>
+    <input id="musicVolume" type="range" min="0" max="100" value="55">
+  </div>
+  <div class="shell home-grid">
+    <section class="panel home-card">
+      <img src="/assets/images/logo.png" alt="โลโก้เกม" class="logo">
+      <h1 class="title">สงครามโคตรเสียว<br></h1>
+      <p class="subtitle">Ultimate Siao War</p>
+
+      <label class="field">
+        <span>ชื่อผู้เล่น</span>
+        <input id="nameInput" type="text" maxlength="20" placeholder="เช่น PinkBerry123">
+      </label>
+
+      <label class="field">
+        <span>Room ID สำหรับเข้าห้อง</span>
+        <input id="roomInput" type="text" maxlength="8" placeholder="เช่น AB12CD">
+      </label>
+
+      <div class="button-row" style="margin-top:18px;">
+        <button id="createBtn" class="btn btn-primary">สร้างห้อง</button>
+        <button id="joinBtn" class="btn">เข้าร่วมห้อง</button>
+      </div>
+
+      <div class="notice">
+        ระบบเกมตอนนี้กำลังเล่นได้แค่พื้นฐาน ยังใช้งานการ์ดไม่ได้ครบทุกใบ
+      </div>
+    </section>
+
+    <section class="panel board-card">
+      <h2 style="margin-top:0;">สถิติ & ลีดเดอร์บอร์ด</h2>
+      <p class="muted">ตรงนี้จะเก็บรายชื่อผู้เล่นและคะแนน อนาคตอาจจะเป็นแรงค์กิ้ง</p>
+      <div id="leaderboardList" class="leaderboard-list">
+        <div class="empty-box">กำลังโหลดสถิติ...</div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/music.js" data-track="/assets/audio/index.mp3"></script>
+  <script src="/assets/index.js"></script>
+</body>
+</html>

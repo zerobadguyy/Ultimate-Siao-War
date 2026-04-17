@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>สงครามโคตรเสียว</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="music-widget">
+    <label for="musicVolume">เพลง</label>
+    <input id="musicVolume" type="range" min="0" max="100" value="55">
+  </div>
+  <div id="myTurnBanner" class="my-turn-banner hidden">ถึงตาคุณแล้ว</div>
+
+  <div id="winnerOverlay" class="winner-overlay hidden">
+    <div class="winner-overlay-panel panel">
+      <div id="winnerOverlayTitle" class="winner-overlay-title"></div>
+      <div id="winnerOverlayName" class="winner-overlay-name"></div>
+      <div id="winnerOverlayReason" class="winner-overlay-reason"></div>
+      <div class="winner-overlay-actions">
+        <button id="winnerOverlayContinueBtn" class="btn btn-primary"></button>
+        <button id="winnerOverlayExitBtn" class="btn btn-subtle"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="assemblyWinLayer" class="assembly-win-layer hidden">
+    <div id="assemblyWinArena" class="assembly-win-arena"></div>
+    <div id="assemblyWinFlash" class="assembly-win-flash"></div>
+  </div>
+
+  <div id="videoWinLayer" class="video-win-layer hidden">
+    <div class="video-win-backdrop"></div>
+    <div class="video-win-frame">
+      <div id="videoWinPlayer" class="video-win-player"></div>
+    </div>
+  </div>
+
+  <div id="posterWinLayer" class="poster-win-layer hidden">
+    <div class="poster-win-backdrop"></div>
+    <div class="poster-win-frame">
+      <img id="posterWinImage" class="poster-win-image" src="" alt="winner scene">
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="panel top-bar">
+      <div>
+        <strong>สงครามโคตรเสียว</strong>
+        <div id="roomCode" class="room-code">ROOM ID: -</div>
+      </div>
+      <div id="roundStatus" class="status-pill">กำลังเชื่อมต่อ...</div>
+      <div id="turnStatus" class="status-pill">กำลังเชื่อมต่อ...</div>
+    </div>
+
+    <div class="game-board panel">
+      <div id="effectLayer" class="effect-layer"></div>
+      <div id="centerWarning" class="center-warning hidden"></div>
+
+      <div id="player-0" class="player-slot slot-bottom"></div>
+      <div id="player-1" class="player-slot slot-left"></div>
+      <div id="player-2" class="player-slot slot-top"></div>
+      <div id="player-3" class="player-slot slot-right"></div>
+
+      <div id="centerDropZone" class="center-table">
+        <div class="stack-zone">
+          <div class="table-label">เดค</div>
+          <div id="deckVisual" class="deck-stack"></div>
+          <div id="deckCount" class="table-label">จำนวนการ์ด : 0 ใบ</div>
+        </div>
+
+        <div class="center-card">
+          <div class="table-label">การ์ดที่ถูกใช้งานล่าสุด</div>
+          <div id="lastPlayedCard" class="last-play-box"></div>
+
+          <div class="action-row">
+            <button id="startBtn" class="btn btn-primary" style="display:none;">เริ่มเกม</button>
+            <button id="drawBtn" class="btn btn-subtle">จั่วการ์ด 1 ใบ</button>
+            <button id="endTurnBtn" class="btn btn-primary">จบเทิร์น</button>
+            <button id="callLastCardBtn" class="btn btn-danger hidden">เอื้อยข่าบ</button>
+          </div>
+
+          <div id="winnerBanner" class="winner-banner"></div>
+          <div id="noticeBox" class="notice">กำลังเชื่อมต่อข้อมูลห้อง...</div>
+        </div>
+
+        <div class="grave-zone">
+          <div class="table-label">สุสาน</div>
+          <div id="graveTop" class="grave-box"></div>
+          <div id="graveCount" class="table-label">จำนวนการ์ดในสุสาน : 0 ใบ</div>
+        </div>
+      </div>
+
+      <div class="sideline-actions">
+        <button id="openGuideModalBtn" class="btn btn-subtle">คำแนะนำ</button>
+        <button id="openLogModalBtn" class="btn btn-subtle">พิธีกรข้างสนาม</button>
+      </div>
+
+      <div class="turn-hud">
+        <button id="openChatModalBtn" class="btn btn-subtle chat-alert-btn">
+          <span id="openChatModalBtnLabel">แชทห้อง</span>
+          <span id="chatUnreadBadge" class="chat-unread-badge hidden">0</span>
+        </button>
+        <div id="turnTicker" class="turn-ticker">กำลังรอข้อมูลเทิร์น...</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="graveyardModal" class="modal-backdrop hidden">
+    <div class="panel modal-card">
+      <div class="modal-head">
+        <strong>การ์ดในสุสาน</strong>
+        <button id="closeGraveyardModalBtn" class="btn btn-subtle modal-close">ปิด</button>
+      </div>
+      <div id="graveyardModalCount" class="muted">จำนวนการ์ดในสุสาน : 0 ใบ</div>
+      <div id="graveyardModalList" class="modal-card-grid"></div>
+    </div>
+  </div>
+
+  <div id="logModal" class="modal-backdrop hidden">
+    <div class="panel modal-card">
+      <div class="modal-head">
+        <strong>พิธีกรข้างสนาม</strong>
+        <button id="closeLogModalBtn" class="btn btn-subtle modal-close">ปิด</button>
+      </div>
+      <div id="logModalList" class="log-list"></div>
+    </div>
+  </div>
+
+  <div id="chatModal" class="modal-backdrop hidden">
+    <div class="panel modal-card modal-chat">
+      <div class="modal-head">
+        <strong id="chatModalTitle">แชทห้อง</strong>
+        <button id="closeChatModalBtn" class="btn btn-subtle modal-close">ปิด</button>
+      </div>
+      <div id="chatModalList" class="chat-list"></div>
+      <div class="chat-form">
+        <input id="chatInput" class="chat-input" type="text" maxlength="240" placeholder="พิมพ์ข้อความคุยกับเพื่อนในห้อง">
+        <button id="sendChatBtn" class="btn btn-primary">ส่ง</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="guideModal" class="modal-backdrop hidden">
+    <div class="panel modal-card">
+      <div class="modal-head">
+        <strong>คำแนะนำการเล่นเกม</strong>
+        <button id="closeGuideModalBtn" class="btn btn-subtle modal-close">ปิด</button>
+      </div>
+      <div class="guide-copy">
+        <p><strong>วิธีการเล่นเกม</strong> เกมนี้เป็นเกมแบบ Turn-Base</p>
+        <p><strong>เป้าหมายของเกม:</strong> ใครการ์ดหมดมือก่อนเป็นคนชนะ หรือชนะทันทีตามเงื่อนไขพิเศษบนหน้าการ์ด</p>
+        <p>ทุกคนจะได้รับการ์ดคนละ 5 ใบในมือ</p>
+        <p>ดูที่มุมขวา ซ้าย และบน จะเห็นว่าการ์ดของเพื่อนเหลือกันคนละกี่ใบ</p>
+        <p>ตาใครเล่น จะมีแสงสีเขียวขึ้นรอบชื่อของคนนั้น และจะมีแจ้งเตือนว่าถึงตาคุณแล้วตรงกลางจอ มุมขวาล่างจะบอกว่าตอนนี้ถึงตาของใคร</p>
+        <p><strong>การเล่นในแต่ละตา</strong></p>
+        <p>เลือกการ์ดในมือแล้วกดค้าง เพื่อลากลงสนาม การ์ดที่ลงจะไปอยู่ที่กองกลาง</p>
+        <p>การ์ดแต่ละใบมีความสามารถ ก่อนลงให้กดค้างที่การ์ดเพื่ออ่านความสามารถ เช่น แกล้งเพื่อนให้จั่วเพิ่ม หรือป้องกันตัวเอง</p>
+        <p>เมื่อลงการ์ดเสร็จ ให้กดจบเทิร์น จะสลับไปตาของเพื่อนถัดไปทันที</p>
+        <p>ถ้าไม่มีการ์ดให้ลง หรือยังไม่อยากลงการ์ดในตานั้น ให้จั่วการ์ดจากเดคก่อน ถึงจะจบเทิร์นได้</p>
+        <p>ถ้าเหลือการ์ด 1 ใบ ให้กดปุ่มเอื้อยข่าบก่อนจบเทิร์น ไม่งั้นจะถูกลงโทษ</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="targetModal" class="modal-backdrop hidden">
+    <div class="panel modal-card modal-narrow">
+      <div class="modal-head">
+        <strong id="targetModalTitle">เลือกผู้เล่น</strong>
+        <button id="closeTargetModalBtn" class="btn btn-subtle modal-close">ปิด</button>
+      </div>
+      <div id="targetModalDescription" class="muted">เลือกผู้เล่นที่ต้องการ</div>
+      <div id="targetModalChoices" class="choice-list"></div>
+    </div>
+  </div>
+
+  <div id="inspectModal" class="modal-backdrop hidden">
+    <div class="panel modal-card">
+      <div class="modal-head">
+        <strong id="inspectModalTitle">การ์ดที่เปิดดู</strong>
+        <button id="closeInspectModalBtn" class="btn btn-subtle modal-close">ปิด</button>
+      </div>
+      <div id="inspectModalDescription" class="muted">กำลังดูการ์ดในมือของผู้เล่น</div>
+      <div id="inspectModalCards" class="modal-card-grid"></div>
+    </div>
+  </div>
+
+  <div id="cardSelectModal" class="modal-backdrop hidden">
+    <div class="panel modal-card">
+      <div class="modal-head">
+        <strong id="cardSelectModalTitle">เลือกการ์ด</strong>
+        <button id="closeCardSelectModalBtn" class="btn btn-subtle modal-close">ปิด</button>
+      </div>
+      <div id="cardSelectModalDescription" class="muted">เลือกการ์ดที่ต้องการ</div>
+      <div id="cardSelectModalCounter" class="muted" style="margin-top:10px;">เลือกแล้ว 0 ใบ</div>
+      <div id="cardSelectModalCards" class="modal-card-grid"></div>
+      <div class="action-row action-row-right">
+        <button id="confirmCardSelectionBtn" class="btn btn-primary">ยืนยันการเลือก</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overflowHandModal" class="modal-backdrop hidden">
+    <div class="panel modal-card">
+      <div class="modal-head">
+        <strong id="overflowHandModalTitle">การ์ดที่ซ้อนอยู่ในมือ</strong>
+        <button id="closeOverflowHandModalBtn" class="btn btn-subtle modal-close">ปิด</button>
+      </div>
+      <div id="overflowHandModalDescription" class="muted">การ์ดที่เกินจาก 10 ใบจะถูกรวมไว้ตรงนี้</div>
+      <div id="overflowHandModalCards" class="modal-card-grid"></div>
+    </div>
+  </div>
+
+  <div id="cardTooltip" class="tooltip">
+    <img id="cardTooltipImage" class="tooltip-card-image" alt="การ์ดที่กำลังดู">
+    <div id="cardTooltipTitle" class="tooltip-title"></div>
+    <div id="cardTooltipDesc" class="muted"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/music.js" data-track="/assets/audio/game.mp3"></script>
+  <script src="/assets/game.js"></script>
+</body>
+</html>

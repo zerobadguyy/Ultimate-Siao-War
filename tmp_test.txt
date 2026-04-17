@@ -1,0 +1,2 @@
+  { id: "card_01", name: "4L@-#5H@H2", desc: "%*2!@-D!HDI AHI22#LC5I%*2!@!7H-D# 9I5H#-#-0
+015", autoWinOnField: true, lockedFromManualPlay: true },

@@ -446,7 +446,8 @@ function drawCards(room, player, count, options = {}) {
   const drawnCards = [];
   for (let index = 0; index < count; index += 1) {
     if (!room.deck.length) break;
-    drawnCards.push(room.deck.shift());
+    const randomIndex = Math.floor(Math.random() * room.deck.length);
+    drawnCards.push(room.deck.splice(randomIndex, 1)[0]);
   }
   receiveCards(room, player, drawnCards, {
     animate: options.animate,
@@ -459,9 +460,14 @@ function drawCards(room, player, count, options = {}) {
 
 function drawFromGraveyard(room, player, count, options = {}) {
   const drawnCards = [];
+  const excludedCards = new Set(options.excludeCards || []);
   for (let index = 0; index < count; index += 1) {
-    if (!room.graveyard.length) break;
-    drawnCards.push(room.graveyard.shift());
+    const availableIndexes = room.graveyard
+      .map((card, graveIndex) => (excludedCards.has(card) ? -1 : graveIndex))
+      .filter((graveIndex) => graveIndex >= 0);
+    if (!availableIndexes.length) break;
+    const randomIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)];
+    drawnCards.push(room.graveyard.splice(randomIndex, 1)[0]);
   }
   receiveCards(room, player, drawnCards, {
     animate: options.animate,
@@ -684,6 +690,14 @@ function dealCardsSequentially(room, players, counts, options = {}) {
   }
 
   return distributed;
+}
+
+function chooseRandomStartingPlayer(room) {
+  const activePlayers = getActivePlayers(room);
+  if (!activePlayers.length) return null;
+  const picked = activePlayers[Math.floor(Math.random() * activePlayers.length)];
+  room.currentTurn = getPlayerIndex(room, picked.id);
+  return picked;
 }
 
 function equalDealRemainingDeck(room) {
@@ -1415,16 +1429,16 @@ function tryReflectTargetedEffect(room, sourcePlayer, targetPlayer, mode, payloa
     return { reflected: false, blocked: false };
   }
 
-  addLog(room, `${targetPlayer.name} ใช้กระจกวิเศษสะท้อนเอฟเฟกต์จั่วกลับไปที่ ${mirrorCard.name} ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่ ${sourcePlayer.name}`);
+  addLog(room, `${targetPlayer.name} ใช้กระจกวิเศษสะท้อนเอฟเฟกต์กลับไปหา ${sourcePlayer.name}`);
   queuePlayerTag(room, targetPlayer.id, "🔁 สะท้อนกลับ", "effect-swap");
 
   if (mode === "skip") {
     sourcePlayer.skipTurns += payload.count || 1;
-    room.notice = `${sourcePlayer.name} ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่`;
+    room.notice = `${sourcePlayer.name} ถูกสะท้อนให้ข้ามเทิร์น`;
     return {
       reflected: true,
-      announceText: `${sourcePlayer.name} ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่`,
-      targetTags: [{ playerId: sourcePlayer.id, text: "ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่", tone: "effect-skip" }],
+      announceText: `${sourcePlayer.name} ถูกสะท้อนให้ข้ามเทิร์น`,
+      targetTags: [{ playerId: sourcePlayer.id, text: "❌ข้าม", tone: "effect-skip" }],
     };
   }
 
@@ -1439,11 +1453,14 @@ function tryReflectTargetedEffect(room, sourcePlayer, targetPlayer, mode, payloa
   }
 
   if (mode === "draw_graveyard") {
-    const drawn = drawFromGraveyard(room, sourcePlayer, payload.count || 0, { animate: true });
-    room.notice = `${sourcePlayer.name} ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่ ${drawn} ใบà¸ˆà¸²à¸สุสาน`;
+    const drawn = drawFromGraveyard(room, sourcePlayer, payload.count || 0, {
+      animate: true,
+      excludeCards: payload.excludeCards || [],
+    });
+    room.notice = `${sourcePlayer.name} ถูกสะท้อนให้จั่วการ์ด ${drawn} ใบจากสุสาน`;
     return {
       reflected: true,
-      announceText: `${sourcePlayer.name} à¸–à¸¹à¸à¸ªà¸°à¸—à¹‰à¸­à¸™à¹ƒà¸«à¹‰จั่วการ์ด ${drawn} ใบà¸ˆà¸²à¸สุสาน`,
+      announceText: `${sourcePlayer.name} ถูกสะท้อนให้จั่วการ์ด ${drawn} ใบจากสุสาน`,
       targetTags: [{ playerId: sourcePlayer.id, text: `🃏+${drawn}`, tone: "effect-draw effect-draw-green" }],
     };
   }
@@ -1453,7 +1470,7 @@ function tryReflectTargetedEffect(room, sourcePlayer, targetPlayer, mode, payloa
 
 function applyBasicDrawCard(room, player, card) {
   const drawn = drawCards(room, player, 1, { animate: true });
-  addLog(room, buildActionLog(player, card, `จั่วการ์ดà¸ˆà¸²à¸à¸à¸­à¸‡เดค ${drawn} ใบ`));
+  addLog(room, buildActionLog(player, card, `จั่วการ์ดจากเดค ${drawn} ใบ`));
   room.notice = `${player.name} จั่วการ์ด ${drawn} ใบ`;
   return {
     pending: false,
@@ -1478,7 +1495,7 @@ function applyRandomPlayAndDiscardAll(room, player, card) {
     }
   });
 
-  addLog(room, buildActionLog(player, card, "à¸ªà¸¸à¹ˆà¸¡ใช้à¸‡à¸²à¸™à¸à¸²à¸£à¹Œà¸” 1 ใบ à¹à¸¥à¸°à¸ªà¸¸à¹ˆà¸¡à¸—à¸´à¹‰à¸‡à¸¥à¸‡สุสานà¹ƒà¸«à¹‰à¸—à¸¸à¸à¸„à¸™à¸„à¸™à¸¥à¸° 1 ใบ"));
+  addLog(room, buildActionLog(player, card, "à¸ªà¸¸à¹ˆà¸¡ใช้à¸‡à¸²à¸™à¸à¸²à¸£à¹Œà¸” 1 ใบ à¹à¸¥à¸°à¸ªà¸¸à¹ˆà¸¡à¸—à¸´à¹‰à¸‡à¸¥à¸‡สุสานà¹ƒà¸«à¹‰ทุกคนà¸„à¸™à¸¥à¸° 1 ใบ"));
   if (discardedLines.length) {
     addLog(room, discardedLines.join(" / "));
   }
@@ -1538,7 +1555,7 @@ function applyNextPlayerDrawCard(room, player, card) {
   }
 
   const drawn = drawCards(room, target, 2, { animate: true });
-  addLog(room, buildActionLog(player, card, `${target.name} จั่วการ์ด ${drawn} ใบà¸ˆà¸²à¸à¸à¸­à¸‡เดค`));
+  addLog(room, buildActionLog(player, card, `${target.name} จั่วการ์ด ${drawn} ใบจากเดค`));
   room.notice = `${target.name} จั่วการ์ด ${drawn} ใบ`;
   return {
     pending: false,
@@ -1667,7 +1684,7 @@ function resolveLoveChainV2(room, sourcePlayer, targetPlayer, drawCount, card) {
     }
 
     const drawn = drawCards(room, currentTarget, totalDraw, { animate: true });
-    addLog(room, buildActionLog(sourcePlayer, card, `${currentTarget.name} à¹„à¸¡à¹ˆà¸¡à¸µà¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢à¹„à¸§à¹‰à¸ªà¹à¸•à¸„à¸•à¹ˆà¸­ à¸ˆà¸¶à¸‡à¸•à¹‰à¸­à¸‡จั่วการ์ด ${drawn} ใบà¸ˆà¸²à¸à¸à¸­à¸‡เดค`));
+    addLog(room, buildActionLog(sourcePlayer, card, `${currentTarget.name} à¹„à¸¡à¹ˆà¸¡à¸µà¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢à¹„à¸§à¹‰à¸ªà¹à¸•à¸„à¸•à¹ˆà¸­ à¸ˆà¸¶à¸‡à¸•à¹‰à¸­à¸‡จั่วการ์ด ${drawn} ใบจากเดค`));
     room.notice = `${currentTarget.name} à¸£à¸±à¸šà¸ªà¹à¸•à¸„à¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢ ${drawn} ใบ`;
     return {
       pending: false,
@@ -1807,11 +1824,11 @@ function applyCardEffect(room, player, card) {
       ? room.deck.splice(found.index, 1)[0]
       : room.graveyard.splice(found.index, 1)[0];
     receiveCards(room, player, [picked], { animate: true, source: found.source });
-    addLog(room, buildActionLog(player, card, `ข้อความ8 ${picked.name} ข้อความ9${found.source === "deck" ? "เดค" : "สุสาน"}`));
+    addLog(room, buildActionLog(player, card, `แสกนหา${picked.name} จาก${found.source === "deck" ? "เดค" : "สุสาน"}`));
     room.notice = `${player.name} ข้อความ10 ${picked.name} ข้อความ11­`;
     return {
       pending: false,
-      announceText: `${card.name} ข้อความ12 ${picked.name}`,
+      announceText: `${card.name} ได้รับ ${picked.name}`,
       targetTags: [{ playerId: player.id, text: "🃏+1", tone: "effect-draw effect-draw-green" }],
     };
   }
@@ -1894,7 +1911,7 @@ function applyCardEffect(room, player, card) {
       room.deck = shuffle(room.deck);
       room.notice = `${previewCount} ข้อความ13`;
       addLog(room, buildActionLog(player, card, `ข้อความ14 ${previewCount} ใบà¸šà¸™à¸ªà¸¸à¸”`));
-      return { pending: false, announceText: "ข้อความ15" };
+      return { pending: false, announceText: "ไม่มีการ์ดพิงค์เบอร์รี่ใน 10 ใบ" };
     }
     return {
       pending: beginCardSelectionAction(room, player, {
@@ -2168,7 +2185,10 @@ function applyCardEffect(room, player, card) {
         return { pending: false };
       }
 
-      const reflected = tryReflectTargetedEffect(room, player, target, "draw_graveyard", { count: 2 });
+      const reflected = tryReflectTargetedEffect(room, player, target, "draw_graveyard", {
+        count: 2,
+        excludeCards: [card],
+      });
       if (reflected.blocked) {
         addLog(room, buildActionLog(player, card, `${target.name} ข้อความ21`));
         room.notice = `${target.name} ข้อความ22`;
@@ -2179,7 +2199,7 @@ function applyCardEffect(room, player, card) {
         return reflected;
       }
 
-      const drawn = drawFromGraveyard(room, target, 2, { animate: true });
+      const drawn = drawFromGraveyard(room, target, 2, { animate: true, excludeCards: [card] });
       addLog(room, buildActionLog(player, card, `${target.name} (คนถัดไป) จั่วการ์ด ${drawn} ใบจากสุสาน`));
       room.notice = `${target.name} จั่วการ์ด ${drawn} ใบจากสุสาน`;
       return { pending: false };
@@ -2214,7 +2234,7 @@ function applyCardEffect(room, player, card) {
     }
     case "card_36":
       getActivePlayers(room).forEach((target) => {
-        drawFromGraveyard(room, target, 2, { animate: true });
+        drawFromGraveyard(room, target, 2, { animate: true, excludeCards: [card] });
       });
       addLog(room, buildActionLog(player, card, "ผู้เล่นทุกคนจั่วการ์ดจากสุสานคนละ 2 ใบ"));
       room.notice = "ทุกคนจั่วการ์ดจากสุสาน";
@@ -2224,9 +2244,9 @@ function applyCardEffect(room, player, card) {
       getActivePlayers(room).forEach((target) => {
         drawCards(room, target, 3, { animate: true });
       });
-      addLog(room, buildActionLog(player, card, "à¸—à¸¸à¸à¸„à¸™จั่วการ์ด 3 ใบ"));
-      room.notice = "à¸—à¸¸à¸à¸„à¸™จั่วการ์ด 3 ใบ";
-      return { pending: false, announceText: "à¸—à¸¸à¸à¸„à¸™จั่วการ์ด 3 ใบ" };
+      addLog(room, buildActionLog(player, card, "ผู้เล่นทุกคนจั่วการ์ด 3 ใบ"));
+      room.notice = "ผู้เล่นทุกคนจั่วการ์ด 3 ใบ";
+      return { pending: false, announceText: "ผู้เล่นทุกคนจั่วการ์ด 3 ใบ" };
     case "card_37":
       return {
         pending: beginTargetAction(room, player, card, {
@@ -2844,8 +2864,8 @@ function resetRound(room) {
   room.winnerReason = "";
   clearPendingTurnAdvance(room);
   room.resolvedScore = false;
-  room.logs = ["เริ่มรอบใหม่ แจกการ์ดคนละ 5 ใบ"];
-  room.notice = "เกมเริ่มแล้ว ให้ผู้เล่นคนแรกเล่นก่อน";
+      room.logs = ["เริ่มรอบใหม่ แจกการ์ดคนละ 5 ใบ"];
+      room.notice = "กำลังสุ่มผู้เล่นคนแรก";
   room.pendingAction = null;
   room.queuedForcedPlays = [];
   room.pendingIgnoreEmptyHandForIds = [];
@@ -2883,14 +2903,22 @@ function resetRound(room) {
     player.inspectedHand = null;
   });
 
-  dealCardsSequentially(room, getActivePlayers(room), getActivePlayers(room).map(() => 5), {
+  const activePlayers = getActivePlayers(room);
+  dealCardsSequentially(room, activePlayers, activePlayers.map(() => 5), {
     animate: true,
     source: "deck",
     startDelayMs: 180,
     perCardDelayMs: 220,
     soundSpacingMs: 190,
   });
-  beginTurn(room, 0);
+  const firstPlayer = chooseRandomStartingPlayer(room);
+  beginTurn(room, room.currentTurn);
+  if (firstPlayer) {
+    const firstNotice = `${firstPlayer.name} ได้เริ่มเป็นคนแรก`;
+    addLog(room, firstNotice);
+    room.notice = firstNotice;
+    announceCardEffect(room, firstNotice, "effect-announce");
+  }
 }
 
 function removePlayer(socketId) {

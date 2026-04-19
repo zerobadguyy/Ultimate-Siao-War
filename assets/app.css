@@ -300,12 +300,14 @@ button, input { font: inherit; }
   flex: 0 0 auto;
   align-items: center;
   margin-left: 12px;
+  z-index: 120;
 }
 .hand-overflow-toggle {
-  min-width: 112px;
-  min-height: 144px;
-  padding: 14px 12px;
-  border-radius: 24px;
+  min-width: 96px;
+  min-height: 108px;
+  max-height: 108px;
+  padding: 12px 10px;
+  border-radius: 18px;
   border: 1px solid rgba(255,255,255,0.18);
   background: linear-gradient(180deg, rgba(18, 22, 38, 0.95), rgba(11, 14, 26, 0.92));
   color: #fff2f7;
@@ -323,7 +325,7 @@ button, input { font: inherit; }
   color: rgba(255, 232, 244, 0.82);
 }
 .hand-overflow-toggle strong {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
 }
 .hand-overflow-toggle:hover {
@@ -332,12 +334,14 @@ button, input { font: inherit; }
   transform: translateY(-2px);
 }
 .hand-overflow-tray {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 16px);
-  z-index: 30;
-  width: min(640px, 78vw);
-  padding: 16px;
+  position: fixed;
+  left: 50%;
+  bottom: 128px;
+  transform: translateX(-50%);
+  z-index: 880;
+  width: min(860px, 90vw);
+  max-height: 292px;
+  padding: 14px 16px 16px;
   border-radius: 24px;
   border: 1px solid rgba(255,255,255,0.16);
   background: rgba(10, 12, 24, 0.96);
@@ -350,10 +354,16 @@ button, input { font: inherit; }
   color: rgba(255, 236, 244, 0.86);
 }
 .hand-overflow-tray-cards {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, min-content);
+  align-items: start;
+  gap: 10px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: 228px;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
 }
 .hand-overflow-tray-cards .card {
   margin: 0;

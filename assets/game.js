@@ -942,7 +942,7 @@ async function runPinkAssemblyWinnerAnimation(roomState, overlayKey, winnerNames
   }, 320);
 
   state.winnerOverlayKey = overlayKey;
-  winnerOverlayTitle.textContent = "à¹€à¸à¸¡à¸ˆà¸šà¹à¸¥à¹‰à¸§ à¸¢à¸´à¸™à¸”à¸µà¸”à¹‰à¸§à¸¢ à¸œà¸¹à¹‰à¸Šà¸™à¸°à¸„à¸·à¸­";
+  winnerOverlayTitle.textContent = "ขอแสดงความยินดีกับ ผู้ชนะในรอบนี้­";
   renderAnimatedWinnerText(winnerOverlayName, winnerNames.join(", "));
   winnerOverlayReason.textContent = winnerReason;
   winnerOverlay.classList.remove("hidden");
@@ -2133,14 +2133,15 @@ function renderPlayers(roomState) {
         hand.classList.remove("has-overflow");
       }
     } else {
-      for (let count = 0; count < visibleCount; count += 1) {
+      const visibleBackCount = Math.min(visibleCount, 8);
+      for (let count = 0; count < visibleBackCount; count += 1) {
         hand.appendChild(createBackCardElement());
       }
     }
 
     const overlapCards = isMe
       ? Math.min(10, visibleCount)
-      : Math.max(visibleCount, player.cardCount);
+      : Math.min(8, Math.max(visibleCount, player.cardCount));
     if (overlapCards >= 5) {
       hand.classList.add("overlap");
       const overlapValue = Math.min(58, Math.max(18, overlapCards * 4));
@@ -2505,4 +2506,3 @@ chatInput.addEventListener("keydown", (event) => {
     sendChatMessage();
   }
 });
-

@@ -2070,7 +2070,17 @@ function createOverflowHandStack(cards) {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "hand-overflow-toggle";
-  toggle.innerHTML = `<span class="hand-overflow-label">\u0e01\u0e32\u0e23\u0e4c\u0e14\u0e25\u0e49\u0e19\u0e21\u0e37\u0e2d</span><strong>+${cards.length} \u0e43\u0e1a</strong>`;
+  toggle.innerHTML = `
+    <span class="hand-overflow-deck" aria-hidden="true">
+      <span class="hand-overflow-deck-card"></span>
+      <span class="hand-overflow-deck-card"></span>
+      <span class="hand-overflow-deck-card"></span>
+    </span>
+    <span class="hand-overflow-meta">
+      <span class="hand-overflow-label">\u0e01\u0e32\u0e23\u0e4c\u0e14\u0e25\u0e49\u0e19\u0e21\u0e37\u0e2d</span>
+      <strong>+${cards.length} \u0e43\u0e1a</strong>
+    </span>
+  `;
   toggle.addEventListener("click", () => {
     state.overflowHandOpen = !state.overflowHandOpen;
     renderRoom(state.roomState);
@@ -2089,9 +2099,17 @@ function createOverflowHandStack(cards) {
     const trayCards = document.createElement("div");
     trayCards.className = "hand-overflow-tray-cards";
     cards.forEach((card) => {
+      const item = document.createElement("div");
+      item.className = "overflow-card-item";
       const handCard = createHandCard(card);
       handCard.classList.add("card-overflow");
-      trayCards.appendChild(handCard);
+      item.appendChild(handCard);
+
+      const name = document.createElement("div");
+      name.className = "modal-card-name";
+      name.textContent = card.name;
+      item.appendChild(name);
+      trayCards.appendChild(item);
     });
     tray.appendChild(trayCards);
     wrapper.appendChild(tray);

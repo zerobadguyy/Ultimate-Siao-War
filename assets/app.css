@@ -229,7 +229,7 @@ button, input { font: inherit; }
   pointer-events: none;
   z-index: 20;
 }
-.player-slot { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 400px; }
+.player-slot { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 400px; z-index: 24; }
 .slot-bottom { left: 50%; bottom: 18px; transform: translateX(-50%); width: min(92vw, 1100px); }
 .slot-top { left: 50%; top: 18px; transform: translateX(-50%); width: min(88vw, 1060px); }
 .slot-left { left: calc(50% - 640px); top: 0; width: 170px; height: 100%; align-items: flex-start; }
@@ -293,6 +293,8 @@ button, input { font: inherit; }
 }
 .player-hand.has-overflow {
   align-items: flex-end;
+  position: relative;
+  z-index: 940;
 }
 .hand-overflow {
   position: relative;
@@ -300,14 +302,14 @@ button, input { font: inherit; }
   flex: 0 0 auto;
   align-items: center;
   margin-left: 12px;
-  z-index: 120;
+  z-index: 960;
+  isolation: isolate;
 }
 .hand-overflow-toggle {
-  min-width: 96px;
-  min-height: 108px;
-  max-height: 108px;
-  padding: 12px 10px;
-  border-radius: 18px;
+  min-width: 118px;
+  min-height: 152px;
+  padding: 10px 10px 12px;
+  border-radius: 20px;
   border: 1px solid rgba(255,255,255,0.18);
   background: linear-gradient(180deg, rgba(18, 22, 38, 0.95), rgba(11, 14, 26, 0.92));
   color: #fff2f7;
@@ -316,9 +318,42 @@ button, input { font: inherit; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   text-align: center;
+}
+.hand-overflow-deck {
+  position: relative;
+  width: 84px;
+  height: 118px;
+  display: block;
+}
+.hand-overflow-deck-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  background-image: url('/assets/images/back_card.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.34));
+}
+.hand-overflow-deck-card:nth-child(1) {
+  transform: translate(0, 0);
+}
+.hand-overflow-deck-card:nth-child(2) {
+  transform: translate(-5px, 4px);
+  opacity: 0.92;
+}
+.hand-overflow-deck-card:nth-child(3) {
+  transform: translate(5px, -4px);
+  opacity: 0.88;
+}
+.hand-overflow-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 .hand-overflow-label {
   font-size: 13px;
@@ -334,19 +369,21 @@ button, input { font: inherit; }
   transform: translateY(-2px);
 }
 .hand-overflow-tray {
-  position: fixed;
-  left: 50%;
-  bottom: 128px;
-  transform: translateX(-50%);
-  z-index: 880;
-  width: min(860px, 90vw);
-  max-height: 292px;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 14px);
+  z-index: 999;
+  width: min(560px, 58vw);
+  max-height: 320px;
   padding: 14px 16px 16px;
   border-radius: 24px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(10, 12, 24, 0.96);
-  box-shadow: 0 18px 44px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(7, 9, 18, 0.995);
+  box-shadow:
+    0 24px 56px rgba(0,0,0,0.56),
+    0 0 0 1px rgba(255,255,255,0.05);
   backdrop-filter: blur(14px);
+  pointer-events: auto;
 }
 .hand-overflow-tray-header {
   margin-bottom: 12px;
@@ -355,18 +392,26 @@ button, input { font: inherit; }
 }
 .hand-overflow-tray-cards {
   display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(2, min-content);
+  grid-template-columns: repeat(auto-fill, minmax(102px, 1fr));
   align-items: start;
-  gap: 10px 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  max-height: 228px;
+  gap: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 244px;
   padding-bottom: 6px;
   scrollbar-width: thin;
+  position: relative;
+  z-index: 2;
+}
+.overflow-card-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 .hand-overflow-tray-cards .card {
   margin: 0;
+  width: 92px;
 }
 .slot-left .hand-overflow,
 .slot-right .hand-overflow,
@@ -450,6 +495,7 @@ button, input { font: inherit; }
   align-items: start;
   width: min(920px, calc(100vw - 260px));
   transition: box-shadow 0.18s ease, transform 0.18s ease;
+  z-index: 8;
 }
 .center-table.drag-ready {
   box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
@@ -466,6 +512,8 @@ button, input { font: inherit; }
   border-radius: 24px;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.1);
+  position: relative;
+  z-index: 1;
 }
 .deck-stack, .grave-box, .last-play-box {
   position: relative;
@@ -583,7 +631,7 @@ button, input { font: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
-  z-index: 7;
+  z-index: 1002;
 }
 .turn-ticker {
   padding: 10px 16px;
@@ -596,10 +644,13 @@ button, input { font: inherit; }
 }
 .turn-hud .btn {
   min-width: 132px;
+  position: relative;
+  z-index: 1003;
 }
 .chat-alert-btn {
   position: relative;
   overflow: visible;
+  z-index: 1004;
 }
 .chat-alert-btn.has-unread {
   border-color: rgba(255, 94, 120, 0.44);

@@ -4,6 +4,42 @@ const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
 const leaderboardList = document.getElementById("leaderboardList");
 
+function hydrateIndexText() {
+  document.title = "สงครามโคตรเสียว";
+  const musicLabel = document.querySelector(".music-widget label");
+  if (musicLabel) musicLabel.textContent = "เพลง";
+
+  const logo = document.querySelector(".logo");
+  if (logo) logo.alt = "โลโก้เกม";
+
+  const title = document.querySelector(".title");
+  if (title) title.innerHTML = "สงครามโคตรเสียว<br>";
+
+  const fieldLabels = document.querySelectorAll(".field > span");
+  if (fieldLabels[0]) fieldLabels[0].textContent = "ชื่อผู้เล่น";
+  if (fieldLabels[1]) fieldLabels[1].textContent = "Room ID สำหรับเข้าห้อง";
+
+  nameInput.placeholder = "เช่น PinkBerry123";
+  roomInput.placeholder = "เช่น AB12CD";
+
+  const createBtn = document.getElementById("createBtn");
+  const joinBtn = document.getElementById("joinBtn");
+  if (createBtn) createBtn.textContent = "สร้างห้อง";
+  if (joinBtn) joinBtn.textContent = "เข้าร่วมห้อง";
+
+  const notice = document.querySelector(".home-card .notice");
+  if (notice) {
+    notice.textContent = "ระบบเกมตอนนี้กำลังเล่นได้แบบพื้นฐาน และรองรับกติกาหลักของการ์ดแล้ว";
+  }
+
+  const boardTitle = document.querySelector(".board-card h2");
+  if (boardTitle) boardTitle.textContent = "สถิติ & ลีดเดอร์บอร์ด";
+  const boardDesc = document.querySelector(".board-card .muted");
+  if (boardDesc) {
+    boardDesc.textContent = "ตรงนี้จะเก็บรายชื่อผู้เล่น จำนวนรอบที่เล่น ชนะ และคะแนนรวม";
+  }
+}
+
 function getPlayerName() {
   return nameInput.value.trim();
 }
@@ -78,4 +114,5 @@ socket.on("roomCreated", ({ roomId }) => {
 socket.on("errorMsg", (msg) => alert(msg));
 
 nameInput.value = localStorage.getItem("playerName") || "";
+hydrateIndexText();
 loadLeaderboard();

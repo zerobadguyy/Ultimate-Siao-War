@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -24,13 +24,16 @@ const VALESKA_WIN_COUNT = 10;
 const BASIC_DRAW_SET = ["card_38", "card_39", "card_40", "card_41", "card_42"];
 const BASIC_SKIP_SET = ["card_44", "card_45", "card_46", "card_47", "card_48"];
 const NEXT_DRAW_SET = ["card_51", "card_52", "card_53", "card_54", "card_55"];
-const LOVE_STACK_SET = ["card_66", "card_67", "card_68", "card_69", "card_70", "card_71"];
+const STEAL_ASSEMBLY_SET = ["card_66", "card_67"];
+const SCAN_ASSEMBLY_SET = ["card_68", "card_69"];
+const LOVE_STACK_SET = [];
 const JOJIG_ALL_SET = ["card_72", "card_73"];
 const BIRD_DISCARD_SET = ["card_74", "card_75", "card_76", "card_77", "card_78", "card_79", "card_80"];
 const MAGIC_MIRROR_SET = ["card_81", "card_82", "card_83", "card_84", "card_85"];
 const LIZARD_SET = ["card_86", "card_87", "card_88", "card_89"];
 const BELL_GHOST_SET = ["card_90", "card_91", "card_92", "card_93", "card_94"];
 const REVERSE_TIME_SET = ["card_99", "card_100", "card_101", "card_102", "card_103", "card_104"];
+const PINKBERRY_SCOPE_SET = ["card_105", "card_109", "card_110", "card_111"];
 
 app.use(express.json());
 app.use("/assets", express.static(path.join(__dirname, "assets")));
@@ -40,15 +43,15 @@ const rooms = {};
 
 function repairText(value) {
   if (typeof value !== "string") return value;
-  if (!/[àÃâ]/.test(value)) return value;
+  if (!/[Ã ÃƒÃ¢]/.test(value)) return value;
 
   let fixed = value;
   for (let count = 0; count < 2; count += 1) {
     try {
       const candidate = Buffer.from(fixed, "latin1").toString("utf8");
-      if (!candidate || candidate.includes("�")) break;
+      if (!candidate || candidate.includes("ï¿½")) break;
       fixed = candidate;
-      if (!/[àÃâ]/.test(fixed)) break;
+      if (!/[Ã ÃƒÃ¢]/.test(fixed)) break;
     } catch (_error) {
       break;
     }
@@ -56,8 +59,92 @@ function repairText(value) {
   return fixed;
 }
 
+function repairText(value) {
+  if (typeof value !== "string") return value;
+  if (!value) return value;
+  if (/[\u0E00-\u0E7F]/.test(value) && !/(?:Ã|Â|à¸|à¹|àº|ï¿½|�|ðŸ|â)/.test(value)) return value;
+  if (/^[\x00-\x7F]*$/.test(value)) return value;
+
+  const scoreText = (text) => {
+    const thai = (text.match(/[\u0E00-\u0E7F]/g) || []).length;
+    const mojibake = (text.match(/(?:Ã|Â|à¸|à¹|àº|ï¿½)/g) || []).length;
+    const replacement = (text.match(/�/g) || []).length;
+    return (thai * 4) - (mojibake * 3) - (replacement * 6);
+  };
+
+  let fixed = value;
+  let best = value;
+  let bestScore = scoreText(value);
+  for (let count = 0; count < 3; count += 1) {
+    try {
+      const candidate = Buffer.from(fixed, "latin1").toString("utf8");
+      if (!candidate || candidate === fixed) break;
+      const candidateScore = scoreText(candidate);
+      if (candidateScore > bestScore) {
+        best = candidate;
+        bestScore = candidateScore;
+      }
+      fixed = candidate;
+      if (/[\u0E00-\u0E7F]/.test(candidate) && !/(?:Ã|Â|à¸|à¹|àº|ï¿½)/.test(candidate)) break;
+    } catch (_error) {
+      break;
+    }
+  }
+  return best;
+}
+
+function repairText(value) {
+  if (typeof value !== "string") return value;
+  if (!value) return value;
+  if (/[\u0E00-\u0E7F]/.test(value) && !/(?:Ã|Â|à¸|à¹|àº|ï¿½|�|ðŸ|â)/.test(value)) return value;
+  if (/^[\x00-\x7F]*$/.test(value)) return value;
+
+  const cp1252Map = {
+    0x20AC: 0x80, 0x201A: 0x82, 0x0192: 0x83, 0x201E: 0x84, 0x2026: 0x85,
+    0x2020: 0x86, 0x2021: 0x87, 0x02C6: 0x88, 0x2030: 0x89, 0x0160: 0x8A,
+    0x2039: 0x8B, 0x0152: 0x8C, 0x017D: 0x8E, 0x2018: 0x91, 0x2019: 0x92,
+    0x201C: 0x93, 0x201D: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+    0x02DC: 0x98, 0x2122: 0x99, 0x0161: 0x9A, 0x203A: 0x9B, 0x0153: 0x9C,
+    0x017E: 0x9E, 0x0178: 0x9F,
+  };
+
+  const encodeCp1252 = (text) => Buffer.from(
+    [...text].map((char) => {
+      const code = char.charCodeAt(0);
+      if (code <= 0xFF) return code;
+      return cp1252Map[code] ?? 0x3F;
+    }),
+  );
+  const scoreText = (text) => {
+    const thai = (text.match(/[\u0E00-\u0E7F]/g) || []).length;
+    const mojibake = (text.match(/(?:Ã|Â|à¸|à¹|àº|ï¿½|�)/g) || []).length;
+    return (thai * 4) - (mojibake * 3);
+  };
+
+  let fixed = value;
+  let best = value;
+  let bestScore = scoreText(value);
+  for (let count = 0; count < 4; count += 1) {
+    try {
+      const candidate = encodeCp1252(fixed).toString("utf8");
+      if (!candidate || candidate === fixed) break;
+      const candidateScore = scoreText(candidate);
+      if (candidateScore > bestScore) {
+        best = candidate;
+        bestScore = candidateScore;
+      }
+      fixed = candidate;
+      if (/[\u0E00-\u0E7F]/.test(candidate) && !/(?:Ã|Â|à¸|à¹|àº|ï¿½|�)/.test(candidate)) break;
+    } catch (_error) {
+      break;
+    }
+  }
+  return best;
+}
+
 const PINKBERRY_NAME = "พิงค์เบอร์รี่";
 const BETHANY_NAME_PATTERN = /เบธานี|เบธานี่/;
+const LAST_CARD_DELAY_MS = 5000;
 
 function createPlayerState(id, name) {
   return {
@@ -73,11 +160,13 @@ function createPlayerState(id, name) {
     skipTurns: 0,
     sleepTurns: 0,
     josephineShield: false,
+    josephineShieldPendingWin: false,
     turnCardsUsed: 0,
     turnActionTaken: false,
     turnDrewCard: false,
     turnPlayedCard: false,
     turnOverusePenaltyApplied: false,
+    turnKeepOpen: false,
     saidLastCard: false,
     linkWinTo: null,
     linkWinLoseTo: null,
@@ -113,6 +202,7 @@ function createRoomState(roomId) {
     playDirection: 1,
     laughingDisabled: false,
     centerWarning: null,
+    pendingTurnAdvance: null,
     timedThreats: {
       josephine: null,
       pinkLaugh: null,
@@ -285,6 +375,12 @@ function refreshLastCardFlag(player) {
   }
 }
 
+function clearPendingTurnAdvance(room) {
+  if (!room?.pendingTurnAdvance) return;
+  clearTimeout(room.pendingTurnAdvance.timeoutId);
+  room.pendingTurnAdvance = null;
+}
+
 function isCardUsable(card) {
   return !!card && !card.cannotBeUsed;
 }
@@ -324,6 +420,26 @@ function receiveCards(room, player, cards, options = {}) {
     });
   }
   return cards.length;
+}
+
+function getCardSortValue(card) {
+  const id = typeof card === "string" ? card : card?.id || "";
+  const match = /^card_(\d+)$/.exec(id);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function sortCardsByFileId(cards) {
+  return [...(cards || [])].sort((left, right) => {
+    const diff = getCardSortValue(left) - getCardSortValue(right);
+    if (diff !== 0) return diff;
+    return String(left?.id || "").localeCompare(String(right?.id || ""));
+  });
+}
+
+function consumeKeepOpenTurn(player) {
+  if (!player?.turnKeepOpen) return false;
+  player.turnKeepOpen = false;
+  return true;
 }
 
 function drawCards(room, player, count, options = {}) {
@@ -412,6 +528,7 @@ function beginTurn(room, index = room.currentTurn) {
     advanceTurn(room);
     return;
   }
+  clearPendingTurnAdvance(room);
   room.currentTurn = index;
   clearPendingAction(room);
   player.turnCardsUsed = 0;
@@ -419,8 +536,54 @@ function beginTurn(room, index = room.currentTurn) {
   player.turnDrewCard = false;
   player.turnPlayedCard = false;
   player.turnOverusePenaltyApplied = false;
+  player.turnKeepOpen = false;
   refreshLastCardFlag(player);
   room.notice = `ถึงตาของ ${player.name}`;
+}
+
+function applyLastCardPenaltyIfNeeded(room, player) {
+  if (!player || room.roundEnded) return;
+  if (player.hand.length === 1 && !player.saidLastCard) {
+    const penaltyDrawn = drawCards(room, player, 5, { animate: true });
+    addLog(room, `${player.name} ไม่ได้กดเอื้อยข่าบ จึงโดนจั่วเพิ่ม ${penaltyDrawn} ใบ`);
+    room.notice = `${player.name} โดนลงโทษเพราะไม่ได้กดเอื้อยข่าบ`;
+  }
+}
+
+function finishAutoCompleteTurn(room, player, reason) {
+  if (!room || room.roundEnded || !player) return;
+  applyLastCardPenaltyIfNeeded(room, player);
+  evaluatePlayers(room, reason || `${player.name} จบเทิร์นอัตโนมัติ`);
+  if (room.roundEnded) return;
+  room.turnCounter += 1;
+  tickTimedThreats(room);
+  if (room.roundEnded) return;
+  const previousName = player.name;
+  advanceTurn(room);
+  if (!room.roundEnded && !room.notice.startsWith("ข้ามเทิร์น")) {
+    room.notice = `จบเทิร์นของ ${previousName} แล้ว ถึงตาของ ${getCurrentPlayer(room)?.name || "-"}`;
+  }
+}
+
+function autoCompleteTurn(room, player, reason) {
+  if (!room || room.roundEnded || !player) return;
+  if (player.hand.length === 1) {
+    if (!room.pendingTurnAdvance || room.pendingTurnAdvance.playerId !== player.id) {
+      clearPendingTurnAdvance(room);
+      room.pendingTurnAdvance = {
+        playerId: player.id,
+        timeoutId: setTimeout(() => {
+          if (!room.pendingTurnAdvance || room.pendingTurnAdvance.playerId !== player.id) return;
+          room.pendingTurnAdvance = null;
+          finishAutoCompleteTurn(room, player, reason);
+          emitRoomState(room.roomId);
+        }, LAST_CARD_DELAY_MS),
+      };
+      room.notice = `รอ ${player.name} กดเอื้อยข่าบภายใน 5 วินาที`;
+    }
+    return;
+  }
+  finishAutoCompleteTurn(room, player, reason);
 }
 
 function advanceTurn(room) {
@@ -649,7 +812,7 @@ function isSleepProtected(player) {
 }
 
 function isBethanyCard(card) {
-  return !!card && BETHANY_NAME_PATTERN.test(repairText(card.name));
+  return !!card && repairText(card.name).includes("เบธานี");
 }
 
 function playerHasCard(player, cardId) {
@@ -672,6 +835,7 @@ function getDreamShieldWinners(room) {
 
 function settleRound(room, config) {
   if (room.roundEnded) return;
+  clearPendingTurnAdvance(room);
 
   const winners = new Set(config.winnerIds || []);
   room.players.forEach((player) => {
@@ -799,6 +963,12 @@ function cancelTimedThreat(room, threatKey, cancelNotice) {
   const current = room.timedThreats[threatKey];
   if (!current?.active) return;
   room.timedThreats[threatKey] = null;
+  if (threatKey === "josephine") {
+    room.players.forEach((player) => {
+      player.josephineShield = false;
+      player.josephineShieldPendingWin = false;
+    });
+  }
   if (cancelNotice) {
     addLog(room, cancelNotice);
     room.notice = cancelNotice;
@@ -852,6 +1022,7 @@ function tickTimedThreats(room) {
     }
 
     settleRound(room, {
+      winnerIds: entry.key === "josephine" ? getDreamShieldWinners(room).map((player) => player.id) : [],
       reason: entry.failReason,
       scoreDeltas: entry.scoreDeltas,
     });
@@ -889,15 +1060,6 @@ function checkSpecialRoundConditions(room) {
   const josephineInHand = activePlayers.some((player) => playerHasCard(player, "card_15"));
   const hasFiveCards = activePlayers.some((player) => player.hand.length === 5);
   const deckOrGraveHasFive = room.deck.length === 5 || room.graveyard.length === 5;
-  const dreamShieldWinners = getDreamShieldWinners(room);
-  if (!room.laughingDisabled && josephineInHand && (hasFiveCards || deckOrGraveHasFive) && dreamShieldWinners.length) {
-    setWinners(
-      room,
-      dreamShieldWinners.map((player) => player.id),
-      `${dreamShieldWinners.map((player) => player.name).join(", ")} เปิดโจผู้นี้มีความฝันและชนะทันที เพราะโจเซฟีนกำลังหัวเราะทำงาน`,
-    );
-    return true;
-  }
   if (!room.laughingDisabled && josephineInHand && (hasFiveCards || deckOrGraveHasFive)) {
     startTimedThreat(room, "josephine", {
       reason: "โจเซฟีนกำลังหัวเราะกำลังนับถอยหลัง",
@@ -1030,7 +1192,7 @@ function beginCardSelectionAction(room, actor, config) {
       ? actor.hand.filter((card) => resolvedFilter(card, actor, room))
       : actor.hand;
   const availableCards = sourceCards.map((card) => ({ ...card }));
-  const availableCardIds = availableCards.map((card) => card.id);
+  const availableCardIds = availableCards.map((card) => card.selectionKey || card.id);
   const maxSelections = Math.min(config.maxSelections, availableCards.length);
   const minSelections = Math.min(config.minSelections ?? config.maxSelections, maxSelections);
 
@@ -1052,6 +1214,7 @@ function beginCardSelectionAction(room, actor, config) {
     availableCardIds,
     availableCardsData: Array.isArray(config.availableCardsData) ? availableCards : null,
     selectionSource: config.selectionSource || null,
+    previewCount: config.previewCount || null,
     targetPlayerId: config.targetPlayerId || null,
     requesterId: config.requesterId || null,
     poolPlayerIds: config.poolPlayerIds ? [...config.poolPlayerIds] : null,
@@ -1063,6 +1226,10 @@ function beginCardSelectionAction(room, actor, config) {
 
 function takeCardsFromSelectionSource(room, actor, action, selectedCardIds) {
   if (!Array.isArray(selectedCardIds) || !selectedCardIds.length) return [];
+
+  if (action.selectionSource === "player_pool") {
+    return takeCardsFromPlayerPool(room, selectedCardIds);
+  }
 
   if (action.selectionSource === "deck") {
     return selectedCardIds.map((cardId) => removeFirstCardById(room.deck, cardId)).filter(Boolean);
@@ -1076,7 +1243,7 @@ function takeCardsFromSelectionSource(room, actor, action, selectedCardIds) {
     const pool = [...action.availableCardsData];
     const picked = [];
     selectedCardIds.forEach((cardId) => {
-      const index = pool.findIndex((card) => card.id === cardId);
+      const index = pool.findIndex((card) => (card.selectionKey || card.id) === cardId);
       if (index !== -1) {
         picked.push(pool.splice(index, 1)[0]);
       }
@@ -1086,15 +1253,6 @@ function takeCardsFromSelectionSource(room, actor, action, selectedCardIds) {
   }
 
   return takeCardsFromHandByIds(actor, selectedCardIds);
-}
-
-function registerBethanyReturn(room, player, count = 1) {
-  if (!count || room.roundEnded) return;
-  player.bethanyReturnCount += count;
-  addLog(room, `${player.name} ส่งเบธานีเทพหลับกลับเข้าเดคครบ ${player.bethanyReturnCount}/5 ครั้ง`);
-  if (player.bethanyReturnCount >= 5) {
-    setWinners(room, [player.id], `${player.name} ส่งเบธานีเทพหลับกลับเข้าเดคครบ 5 ครั้ง`);
-  }
 }
 
 function applyTurnOverusePenalty(room, player) {
@@ -1164,6 +1322,7 @@ function triggerCardPlay(room, actingPlayer, card) {
   }
 
   const effectResult = applyCardEffect(room, actingPlayer, card);
+  actingPlayer.turnKeepOpen = !!effectResult.keepTurnOpen;
   notifyTrackedCounters(room, actingPlayer, card);
   applyTurnOverusePenalty(room, actingPlayer);
 
@@ -1225,9 +1384,76 @@ function finalizeResolvedAction(room) {
   return { pending: false };
 }
 
+function maybeAutoAdvanceAfterAction(room, actor) {
+  if (!room || room.roundEnded || room.pendingAction || !actor) return;
+  const currentPlayer = getCurrentPlayer(room);
+  if (!currentPlayer || currentPlayer.id !== actor.id) return;
+  if (actor.turnKeepOpen) return;
+  if (!actor.turnActionTaken) return;
+  autoCompleteTurn(room, actor);
+}
+
+function consumeMirrorCard(room, target) {
+  const mirrorCard = removeFirstMatchingCardFromHand(target, MAGIC_MIRROR_SET);
+  if (!mirrorCard) return null;
+  addCardsToGraveyard(room, [mirrorCard], { animate: true });
+  refreshLastCardFlag(target);
+  return mirrorCard;
+}
+
+function tryReflectTargetedEffect(room, sourcePlayer, targetPlayer, mode, payload = {}) {
+  if (!targetPlayer) {
+    return { reflected: false, blocked: false };
+  }
+
+  if (isSleepProtected(targetPlayer)) {
+    return { reflected: false, blocked: true };
+  }
+
+  const mirrorCard = consumeMirrorCard(room, targetPlayer);
+  if (!mirrorCard) {
+    return { reflected: false, blocked: false };
+  }
+
+  addLog(room, `${targetPlayer.name} ใช้กระจกวิเศษสะท้อนเอฟเฟกต์จั่วกลับไปที่ ${mirrorCard.name} ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่ ${sourcePlayer.name}`);
+  queuePlayerTag(room, targetPlayer.id, "🔁 สะท้อนกลับ", "effect-swap");
+
+  if (mode === "skip") {
+    sourcePlayer.skipTurns += payload.count || 1;
+    room.notice = `${sourcePlayer.name} ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่`;
+    return {
+      reflected: true,
+      announceText: `${sourcePlayer.name} ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่`,
+      targetTags: [{ playerId: sourcePlayer.id, text: "ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่", tone: "effect-skip" }],
+    };
+  }
+
+  if (mode === "draw_deck") {
+    const drawn = drawCards(room, sourcePlayer, payload.count || 0, { animate: true });
+    room.notice = `${sourcePlayer.name} จั่วการ์ด ${drawn} ใบ`;
+    return {
+      reflected: true,
+      announceText: `${sourcePlayer.name} จั่วการ์ด ${drawn} ใบ`,
+      targetTags: [{ playerId: sourcePlayer.id, text: `🃏+${drawn}`, tone: "effect-draw effect-draw-green" }],
+    };
+  }
+
+  if (mode === "draw_graveyard") {
+    const drawn = drawFromGraveyard(room, sourcePlayer, payload.count || 0, { animate: true });
+    room.notice = `${sourcePlayer.name} ยังไม่พิมเดี๋ยวมาพิมทีหลัง สับสนอยู่ ${drawn} ใบà¸ˆà¸²à¸สุสาน`;
+    return {
+      reflected: true,
+      announceText: `${sourcePlayer.name} à¸–à¸¹à¸à¸ªà¸°à¸—à¹‰à¸­à¸™à¹ƒà¸«à¹‰จั่วการ์ด ${drawn} ใบà¸ˆà¸²à¸สุสาน`,
+      targetTags: [{ playerId: sourcePlayer.id, text: `🃏+${drawn}`, tone: "effect-draw effect-draw-green" }],
+    };
+  }
+
+  return { reflected: true, blocked: false };
+}
+
 function applyBasicDrawCard(room, player, card) {
   const drawn = drawCards(room, player, 1, { animate: true });
-  addLog(room, buildActionLog(player, card, `จั่วการ์ดจากกองเดค ${drawn} ใบ`));
+  addLog(room, buildActionLog(player, card, `จั่วการ์ดà¸ˆà¸²à¸à¸à¸­à¸‡เดค ${drawn} ใบ`));
   room.notice = `${player.name} จั่วการ์ด ${drawn} ใบ`;
   return {
     pending: false,
@@ -1242,61 +1468,77 @@ function applyRandomPlayAndDiscardAll(room, player, card) {
   getActivePlayers(room).forEach((target) => {
     const randomPlayable = removeRandomUsableCardFromHand(target);
     if (randomPlayable) {
-      scheduleForcedPlay(room, target.id, randomPlayable, "ถูกสุ่มให้ใช้");
+      scheduleForcedPlay(room, target.id, randomPlayable, "à¸–à¸¹à¸à¸ªà¸¸à¹ˆà¸¡à¹ƒà¸«à¹‰ใช้");
     }
 
     const discardedCard = removeRandomCardFromHand(target);
     if (discardedCard) {
       addCardsToGraveyard(room, [discardedCard], { animate: true });
-      discardedLines.push(`${target.name} ทิ้ง ${discardedCard.name}`);
+      discardedLines.push(`${target.name} à¸—à¸´à¹‰à¸‡ ${discardedCard.name}`);
     }
   });
 
-  addLog(room, buildActionLog(player, card, "สุ่มใช้งานการ์ด 1 ใบ และสุ่มทิ้งลงสุสานให้ทุกคนคนละ 1 ใบ"));
+  addLog(room, buildActionLog(player, card, "à¸ªà¸¸à¹ˆà¸¡ใช้à¸‡à¸²à¸™à¸à¸²à¸£à¹Œà¸” 1 ใบ à¹à¸¥à¸°à¸ªà¸¸à¹ˆà¸¡à¸—à¸´à¹‰à¸‡à¸¥à¸‡สุสานà¹ƒà¸«à¹‰à¸—à¸¸à¸à¸„à¸™à¸„à¸™à¸¥à¸° 1 ใบ"));
   if (discardedLines.length) {
     addLog(room, discardedLines.join(" / "));
   }
 
-  room.notice = "ทุกคนถูกสุ่มให้ใช้การ์ดและสุ่มทิ้งการ์ดลงสุสาน";
+  room.notice = "à¸—à¸¸à¸à¸„à¸™à¸–à¸¹à¸à¸ªà¸¸à¹ˆà¸¡à¹ƒà¸«à¹‰ใช้การ์ดà¹à¸¥à¸°à¸ªà¸¸à¹ˆà¸¡à¸—à¸´à¹‰à¸‡à¸à¸²à¸£à¹Œà¸”à¸¥à¸‡สุสาน";
   const queuedResult = processQueuedForcedPlays(room);
   return {
     ...queuedResult,
-    announceText: "แปะมือหน่อยพี่",
+    announceText: "à¹à¸›à¸°à¸¡à¸·à¸­à¸«à¸™à¹ˆà¸­à¸¢à¸žà¸µà¹ˆ",
   };
 }
 
 function applySkipNextCard(room, player, card) {
   const target = getNextPlayerAfter(room, player.id);
   if (!target || target.id === player.id) {
-    room.notice = "ไม่มีผู้เล่นคนถัดไปให้ข้ามเทิร์น";
+    room.notice = "à¹„à¸¡à¹ˆà¸¡à¸µà¸œà¸¹à¹‰à¹€à¸¥à¹ˆà¸™à¸„à¸™à¸–à¸±à¸”à¹„à¸›à¹ƒà¸«à¹‰à¸‚à¹‰à¸²à¸¡à¹€à¸—à¸´à¸£à¹Œà¸™";
     return { pending: false };
   }
 
+  const reflected = tryReflectTargetedEffect(room, player, target, "skip", { count: 1 });
+  if (reflected.blocked) {
+    addLog(room, buildActionLog(player, card, `${target.name} à¸«à¸¥à¸±à¸šà¸­à¸¢à¸¹à¹ˆ à¸ˆà¸¶à¸‡à¹„à¸¡à¹ˆà¸£à¸±à¸šà¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œà¸‚à¹‰à¸²à¸¡à¹€à¸—à¸´à¸£à¹Œà¸™`));
+    room.notice = `${target.name} à¸«à¸¥à¸±à¸šà¸­à¸¢à¸¹à¹ˆ à¸ˆà¸¶à¸‡à¹„à¸¡à¹ˆà¸£à¸±à¸šà¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œà¸‚à¹‰à¸²à¸¡à¹€à¸—à¸´à¸£à¹Œà¸™`;
+    return { pending: false, announceText: `${target.name} à¸à¸±à¸™à¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œà¹„à¸§à¹‰à¹„à¸”à¹‰` };
+  }
+  if (reflected.reflected) {
+    addLog(room, buildActionLog(player, card, `à¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œà¸–à¸¹à¸à¸ªà¸°à¸—à¹‰à¸­à¸™à¸à¸¥à¸±à¸šà¹„à¸›à¸«à¸² ${player.name}`));
+    return reflected;
+  }
+
   target.skipTurns += 1;
-  addLog(room, buildActionLog(player, card, `ข้ามเทิร์นของ ${target.name}`));
-  room.notice = `${target.name} จะถูกข้ามเทิร์นถัดไป`;
+  addLog(room, buildActionLog(player, card, `à¸‚à¹‰à¸²à¸¡à¹€à¸—à¸´à¸£à¹Œà¸™à¸‚à¸­à¸‡ ${target.name}`));
+  room.notice = `${target.name} à¸ˆà¸°à¸–à¸¹à¸à¸‚à¹‰à¸²à¸¡à¹€à¸—à¸´à¸£à¹Œà¸™à¸–à¸±à¸”à¹„à¸›`;
   return {
     pending: false,
-    announceText: `${target.name} ถูกข้ามเทิร์น`,
-    targetTags: [{ playerId: target.id, text: "❌ข้าม", tone: "effect-skip" }],
+    announceText: `${target.name} à¸–à¸¹à¸à¸‚à¹‰à¸²à¸¡à¹€à¸—à¸´à¸£à¹Œà¸™`,
+    targetTags: [{ playerId: target.id, text: "âŒà¸‚à¹‰à¸²à¸¡", tone: "effect-skip" }],
   };
 }
 
 function applyNextPlayerDrawCard(room, player, card) {
   const target = getNextPlayerAfter(room, player.id);
   if (!target || target.id === player.id) {
-    room.notice = "ไม่มีผู้เล่นคนถัดไปให้จั่วการ์ด";
+    room.notice = "à¹„à¸¡à¹ˆà¸¡à¸µà¸œà¸¹à¹‰à¹€à¸¥à¹ˆà¸™à¸„à¸™à¸–à¸±à¸”à¹„à¸›à¹ƒà¸«à¹‰จั่วการ์ด";
     return { pending: false };
   }
 
-  if (isSleepProtected(target)) {
-    addLog(room, buildActionLog(player, card, `${target.name} หลับอยู่ จึงไม่รับเอฟเฟกต์จั่ว`));
-    room.notice = `${target.name} หลับอยู่ จึงไม่รับเอฟเฟกต์จั่ว`;
-    return { pending: false, announceText: `${target.name} กันเอฟเฟกต์จั่วไว้ได้` };
+  const reflected = tryReflectTargetedEffect(room, player, target, "draw_deck", { count: 2 });
+  if (reflected.blocked) {
+    addLog(room, buildActionLog(player, card, `${target.name} à¸«à¸¥à¸±à¸šà¸­à¸¢à¸¹à¹ˆ à¸ˆà¸¶à¸‡à¹„à¸¡à¹ˆà¸£à¸±à¸šà¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œจั่ว`));
+    room.notice = `${target.name} à¸«à¸¥à¸±à¸šà¸­à¸¢à¸¹à¹ˆ à¸ˆà¸¶à¸‡à¹„à¸¡à¹ˆà¸£à¸±à¸šà¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œจั่ว`;
+    return { pending: false, announceText: `${target.name} à¸à¸±à¸™à¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œจั่วà¹„à¸§à¹‰à¹„à¸”à¹‰` };
+  }
+  if (reflected.reflected) {
+    addLog(room, buildActionLog(player, card, `à¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œจั่วà¸–à¸¹à¸à¸ªà¸°à¸—à¹‰à¸­à¸™à¸à¸¥à¸±à¸šà¹„à¸›à¸«à¸² ${player.name}`));
+    return reflected;
   }
 
-  const drawn = drawCards(room, target, 1, { animate: true });
-  addLog(room, buildActionLog(player, card, `${target.name} จั่วการ์ด ${drawn} ใบจากกองเดค`));
+  const drawn = drawCards(room, target, 2, { animate: true });
+  addLog(room, buildActionLog(player, card, `${target.name} จั่วการ์ด ${drawn} ใบà¸ˆà¸²à¸à¸à¸­à¸‡เดค`));
   room.notice = `${target.name} จั่วการ์ด ${drawn} ใบ`;
   return {
     pending: false,
@@ -1335,7 +1577,7 @@ function resolveLoveChain(room, sourcePlayer, targetPlayer, drawCount, card) {
     safety += 1;
 
     if (isSleepProtected(currentTarget)) {
-      addLog(room, `${currentTarget.name} อยู่ในสถานะหลับอยู่ จึงไม่รับเอฟเฟกต์จั่ว`);
+      addLog(room, `${currentTarget.name} à¸­à¸¢à¸¹à¹ˆà¹ƒà¸™à¸ªà¸–à¸²à¸™à¸°à¸«à¸¥à¸±à¸šà¸­à¸¢à¸¹à¹ˆ à¸ˆà¸¶à¸‡à¹„à¸¡à¹ˆà¸£à¸±à¸šà¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œจั่ว`);
       currentTarget = getNextPlayerAfter(room, currentTarget.id);
       continue;
     }
@@ -1344,7 +1586,7 @@ function resolveLoveChain(room, sourcePlayer, targetPlayer, drawCount, card) {
     if (mirrorCard) {
       addCardsToGraveyard(room, [mirrorCard], { animate: true });
       addLog(room, `${currentTarget.name} ใช้กระจกวิเศษสะท้อนเอฟเฟกต์กลับ`);
-      queuePlayerTag(room, currentTarget.id, "สะท้อนกลับ", "effect-swap");
+      queuePlayerTag(room, currentTarget.id, "🔁 สะท้อนกลับ", "effect-swap");
       const reflectedTarget = currentSource;
       currentSource = currentTarget;
       currentTarget = reflectedTarget;
@@ -1355,15 +1597,15 @@ function resolveLoveChain(room, sourcePlayer, targetPlayer, drawCount, card) {
     if (stackCard) {
       addCardsToGraveyard(room, [stackCard], { animate: true });
       totalDraw += 2;
-      addLog(room, `${currentTarget.name} สแตคฉันรักแกนะเว้ย เพิ่มเป็น ${totalDraw} ใบ`);
-      queuePlayerTag(room, currentTarget.id, "สแตค +2", "effect-draw effect-draw-orange");
+      addLog(room, `${currentTarget.name} à¸ªà¹à¸•à¸„à¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢ à¹€à¸žà¸´à¹ˆà¸¡à¹€à¸›à¹‡à¸™ ${totalDraw} ใบ`);
+      queuePlayerTag(room, currentTarget.id, "à¸ªà¹à¸•à¸„ +2", "effect-draw effect-draw-orange");
       currentSource = currentTarget;
       currentTarget = getNextPlayerAfter(room, currentTarget.id);
       continue;
     }
 
     const drawn = drawCards(room, currentTarget, totalDraw, { animate: true });
-    addLog(room, buildActionLog(sourcePlayer, card, `${currentTarget.name} จั่วการ์ด ${drawn} ใบจากฉันรักแกนะเว้ย`));
+    addLog(room, buildActionLog(sourcePlayer, card, `${currentTarget.name} จั่วการ์ด ${drawn} ใบà¸ˆà¸²à¸à¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢`));
     room.notice = `${currentTarget.name} จั่วการ์ด ${drawn} ใบ`;
     return {
       pending: false,
@@ -1378,8 +1620,8 @@ function resolveLoveChain(room, sourcePlayer, targetPlayer, drawCount, card) {
     };
   }
 
-  room.notice = "ฉันรักแกนะเว้ยไม่มีเป้าหมายให้ลงแล้ว";
-  return { pending: false, announceText: `${card.name} ไม่มีเป้าหมายให้ลง` };
+  room.notice = "à¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸›à¹‰à¸²à¸«à¸¡à¸²à¸¢à¹ƒà¸«à¹‰à¸¥à¸‡à¹à¸¥à¹‰à¸§";
+  return { pending: false, announceText: `${card.name} à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸›à¹‰à¸²à¸«à¸¡à¸²à¸¢à¹ƒà¸«à¹‰à¸¥à¸‡` };
 }
 
 function resolveLoveChainV2(room, sourcePlayer, targetPlayer, drawCount, card) {
@@ -1392,7 +1634,7 @@ function resolveLoveChainV2(room, sourcePlayer, targetPlayer, drawCount, card) {
     safety += 1;
 
     if (isSleepProtected(currentTarget)) {
-      addLog(room, `${currentTarget.name} อยู่ในสถานะหลับอยู่ จึงไม่รับเอฟเฟกต์จั่ว`);
+      addLog(room, `${currentTarget.name} à¸­à¸¢à¸¹à¹ˆà¹ƒà¸™à¸ªà¸–à¸²à¸™à¸°à¸«à¸¥à¸±à¸šà¸­à¸¢à¸¹à¹ˆ à¸ˆà¸¶à¸‡à¹„à¸¡à¹ˆà¸£à¸±à¸šà¹€à¸­à¸Ÿà¹€à¸Ÿà¸à¸•à¹Œจั่ว`);
       currentTarget = getNextPlayerAfter(room, currentTarget.id);
       continue;
     }
@@ -1412,11 +1654,11 @@ function resolveLoveChainV2(room, sourcePlayer, targetPlayer, drawCount, card) {
     if (stackCard) {
       addCardsToGraveyard(room, [stackCard], { animate: true });
       totalDraw += 2;
-      addLog(room, `${currentTarget.name} สแตคฉันรักแกนะเว้ย ส่งต่อเป็น ${totalDraw} ใบ`);
+      addLog(room, `${currentTarget.name} à¸ªà¹à¸•à¸„à¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢ à¸ªà¹ˆà¸‡à¸•à¹ˆà¸­à¹€à¸›à¹‡à¸™ ${totalDraw} ใบ`);
       queuePlayerTag(
         room,
         currentTarget.id,
-        `สแตค ${totalDraw}`,
+        `à¸ªà¹à¸•à¸„ ${totalDraw}`,
         totalDraw >= 6 ? "effect-draw effect-draw-purple" : "effect-draw effect-draw-orange",
       );
       currentSource = currentTarget;
@@ -1425,11 +1667,11 @@ function resolveLoveChainV2(room, sourcePlayer, targetPlayer, drawCount, card) {
     }
 
     const drawn = drawCards(room, currentTarget, totalDraw, { animate: true });
-    addLog(room, buildActionLog(sourcePlayer, card, `${currentTarget.name} ไม่มีฉันรักแกนะเว้ยไว้สแตคต่อ จึงต้องจั่วการ์ด ${drawn} ใบจากกองเดค`));
-    room.notice = `${currentTarget.name} รับสแตคฉันรักแกนะเว้ย ${drawn} ใบ`;
+    addLog(room, buildActionLog(sourcePlayer, card, `${currentTarget.name} à¹„à¸¡à¹ˆà¸¡à¸µà¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢à¹„à¸§à¹‰à¸ªà¹à¸•à¸„à¸•à¹ˆà¸­ à¸ˆà¸¶à¸‡à¸•à¹‰à¸­à¸‡จั่วการ์ด ${drawn} ใบà¸ˆà¸²à¸à¸à¸­à¸‡เดค`));
+    room.notice = `${currentTarget.name} à¸£à¸±à¸šà¸ªà¹à¸•à¸„à¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢ ${drawn} ใบ`;
     return {
       pending: false,
-      announceText: `${card.name} สแตค ${drawn} ใบใส่ ${currentTarget.name}`,
+      announceText: `${card.name} à¸ªà¹à¸•à¸„ ${drawn} ใบà¹ƒà¸ªà¹ˆ ${currentTarget.name}`,
       targetTags: [
         {
           playerId: currentTarget.id,
@@ -1444,8 +1686,8 @@ function resolveLoveChainV2(room, sourcePlayer, targetPlayer, drawCount, card) {
     };
   }
 
-  room.notice = "ฉันรักแกนะเว้ยไม่มีเป้าหมายให้ลงแล้ว";
-  return { pending: false, announceText: `${card.name} ไม่มีเป้าหมายให้ลง` };
+  room.notice = "à¸‰à¸±à¸™à¸£à¸±à¸à¹à¸à¸™à¸°à¹€à¸§à¹‰à¸¢à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸›à¹‰à¸²à¸«à¸¡à¸²à¸¢à¹ƒà¸«à¹‰à¸¥à¸‡à¹à¸¥à¹‰à¸§";
+  return { pending: false, announceText: `${card.name} à¹„à¸¡à¹ˆà¸¡à¸µà¹€à¸›à¹‰à¸²à¸«à¸¡à¸²à¸¢à¹ƒà¸«à¹‰à¸¥à¸‡` };
 }
 
 function rotateOtherHands(room, actor) {
@@ -1459,6 +1701,63 @@ function rotateOtherHands(room, actor) {
   });
   queueEffect(room, { type: "swap", allTable: true });
   return true;
+}
+
+function buildAssemblyStealPool(room, actor) {
+  return sortCardsByFileId(
+    room.players.flatMap((candidate) => (
+      !candidate.eliminated && candidate.id !== actor.id
+        ? candidate.hand
+          .filter((heldCard) => ASSEMBLY_SET.includes(heldCard.id))
+          .map((heldCard, index) => ({
+            ...heldCard,
+            selectionKey: `${candidate.id}:${heldCard.id}:${index}`,
+            ownerId: candidate.id,
+            ownerName: candidate.name,
+          }))
+        : []
+    )),
+  );
+}
+
+function takeCardsFromPlayerPool(room, selectedKeys) {
+  const wanted = new Set(selectedKeys || []);
+  const picked = [];
+  room.players.forEach((candidate) => {
+    if (!wanted.size) return;
+    let matchIndex = 0;
+    candidate.hand = candidate.hand.filter((heldCard) => {
+      const key = `${candidate.id}:${heldCard.id}:${matchIndex}`;
+      matchIndex += 1;
+      if (!wanted.has(key)) return true;
+      wanted.delete(key);
+      picked.push({
+        ...heldCard,
+        ownerId: candidate.id,
+        ownerName: candidate.name,
+        selectionKey: key,
+      });
+      return false;
+    });
+    refreshLastCardFlag(candidate);
+  });
+  return picked;
+}
+
+function findMissingAssemblyPart(room, player) {
+  const owned = new Set(player.hand.filter((heldCard) => ASSEMBLY_SET.includes(heldCard.id)).map((heldCard) => heldCard.id));
+  const missing = ASSEMBLY_SET.filter((cardId) => !owned.has(cardId));
+  const candidates = [];
+  missing.forEach((cardId) => {
+    room.deck.forEach((deckCard, index) => {
+      if (deckCard.id === cardId) candidates.push({ source: "deck", index, card: deckCard });
+    });
+    room.graveyard.forEach((graveCard, index) => {
+      if (graveCard.id === cardId) candidates.push({ source: "graveyard", index, card: graveCard });
+    });
+  });
+  if (!candidates.length) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 function applyCardEffect(room, player, card) {
@@ -1478,8 +1777,43 @@ function applyCardEffect(room, player, card) {
     return applyNormalBethany(room, player, card);
   }
 
-  if (LOVE_STACK_SET.includes(card.id)) {
-    return resolveLoveChainV2(room, player, getNextPlayerAfter(room, player.id), 2, card);
+  if (STEAL_ASSEMBLY_SET.includes(card.id)) {
+    return {
+      pending: beginCardSelectionAction(room, player, {
+        cardId: card.id,
+        cardName: card.name,
+        effect: "steal_assembly_part",
+        title: "ข้อความ 1",
+        description: "ข้อความ 2",
+        minSelections: 1,
+        maxSelections: 1,
+        selectionSource: "player_pool",
+        availableCardsData: buildAssemblyStealPool(room, player),
+        emptyNotice: "ข้อความ3",
+      }),
+      announceText: `${card.name} ข้อความ4`,
+    };
+  }
+
+  if (SCAN_ASSEMBLY_SET.includes(card.id)) {
+    const found = findMissingAssemblyPart(room, player);
+    if (!found) {
+      room.notice = "ข้อความ5";
+      addLog(room, buildActionLog(player, card, "ข้อความ6"));
+      return { pending: false, announceText: `${card.name} ข้อความ7` };
+    }
+
+    const picked = found.source === "deck"
+      ? room.deck.splice(found.index, 1)[0]
+      : room.graveyard.splice(found.index, 1)[0];
+    receiveCards(room, player, [picked], { animate: true, source: found.source });
+    addLog(room, buildActionLog(player, card, `ข้อความ8 ${picked.name} ข้อความ9${found.source === "deck" ? "เดค" : "สุสาน"}`));
+    room.notice = `${player.name} ข้อความ10 ${picked.name} ข้อความ11­`;
+    return {
+      pending: false,
+      announceText: `${card.name} ข้อความ12 ${picked.name}`,
+      targetTags: [{ playerId: player.id, text: "🃏+1", tone: "effect-draw effect-draw-green" }],
+    };
   }
 
   if (JOJIG_ALL_SET.includes(card.id)) {
@@ -1514,8 +1848,8 @@ function applyCardEffect(room, player, card) {
         cardId: card.id,
         cardName: card.name,
         effect: "take_from_deck",
-        title: "เลือกการ์ดจากเดคขึ้นมือ",
-        description: "เลือกการ์ด 1 ใบจากเดคขึ้นมือ",
+        title: "เลือกการ์ดจากเดคขึ้นมือ­",
+        description: "เลือกการ์ด 1 ใบจากเดคขึ้นมือ­",
         minSelections: 1,
         maxSelections: 1,
         selectionSource: "deck",
@@ -1532,8 +1866,8 @@ function applyCardEffect(room, player, card) {
         cardId: card.id,
         cardName: card.name,
         effect: "take_from_graveyard",
-        title: "เลือกการ์ดจากสุสานขึ้นมือ",
-        description: "เลือกการ์ด 1 ใบจากสุสานขึ้นมือ",
+        title: "เลือกการ์ดจากสุสานขึ้นมือ­",
+        description: "เลือกการ์ด 1 ใบจากสุสานขึ้นมือ­",
         minSelections: 1,
         maxSelections: 1,
         selectionSource: "graveyard",
@@ -1550,6 +1884,34 @@ function applyCardEffect(room, player, card) {
     addLog(room, buildActionLog(player, card, room.playDirection === -1 ? "เปลี่ยนทิศทางเป็นวนขวา" : "เปลี่ยนทิศทางเป็นวนซ้าย"));
     room.notice = room.playDirection === -1 ? "เกมเปลี่ยนเป็นวนขวา" : "เกมเปลี่ยนเป็นวนซ้าย";
     return { pending: false, announceText: room.notice };
+  }
+
+  if (PINKBERRY_SCOPE_SET.includes(card.id)) {
+    const previewCount = 10;
+    const previewCards = room.deck.slice(0, previewCount);
+    const pinkberryCards = previewCards.filter((candidate) => repairText(candidate.name).includes("พิงค์เบอร์รี่"));
+    if (!pinkberryCards.length) {
+      room.deck = shuffle(room.deck);
+      room.notice = `${previewCount} ข้อความ13`;
+      addLog(room, buildActionLog(player, card, `ข้อความ14 ${previewCount} ใบà¸šà¸™à¸ªà¸¸à¸”`));
+      return { pending: false, announceText: "ข้อความ15" };
+    }
+    return {
+      pending: beginCardSelectionAction(room, player, {
+        cardId: card.id,
+        cardName: card.name,
+        effect: "take_from_deck_preview",
+        title: "ข้อความ16",
+        description: `ข้อความ17” ${previewCount} ใบข้อความ18`,
+        minSelections: 1,
+        maxSelections: 1,
+        selectionSource: "deck_preview",
+        availableCardsData: pinkberryCards,
+        previewCount,
+        emptyNotice: "ข้อความ19",
+      }),
+      announceText: `${card.name} ข้อความ20`,
+    };
   }
 
   switch (card.id) {
@@ -1594,7 +1956,7 @@ function applyCardEffect(room, player, card) {
     case "card_13":
       addLog(room, buildActionLog(player, card, "แย่งเทิร์นมาเป็นของตัวเอง"));
       room.notice = `${player.name} แย่งเทิร์นสำเร็จ`;
-      return { pending: false, takeoverTurn: true };
+      return { pending: false, takeoverTurn: true, keepTurnOpen: true };
     case "card_14":
       return {
         pending: beginTargetAction(room, player, card, {
@@ -1604,10 +1966,6 @@ function applyCardEffect(room, player, card) {
         }),
       };
     case "card_15":
-      if (player.josephineShield) {
-        setWinners(room, [player.id], `${player.name} ใช้โจเซฟีนกำลังหัวเราะขณะมีโจผู้นี้มีความฝัน จึงชนะทันที`);
-        return { pending: false };
-      }
       addLog(room, buildActionLog(player, card, "การ์ดใบนี้ไม่มีเอฟเฟกต์ตอนใช้"));
       room.notice = `${player.name} ใช้ ${card.name}`;
       return { pending: false };
@@ -1640,7 +1998,7 @@ function applyCardEffect(room, player, card) {
           ? "นอกเกม"
           : "เดค";
       addLog(room, buildActionLog(player, card, `เรียกโจเซฟีนกำลังหัวเราะกลับจาก${sourceLabel}`));
-      room.notice = `${player.name} เรียกโจเซฟีนกำลังหัวเราะขึ้นมือ`;
+      room.notice = `${player.name} เรียกโจเซฟีนกำลังหัวเราะขึ้นมือ­`;
       return { pending: false };
     }
     case "card_18":
@@ -1794,7 +2152,7 @@ function applyCardEffect(room, player, card) {
         cardName: card.name,
         effect: "sequential_discard_many",
         title: "เลือกการ์ดลงสุสาน",
-        description: `${firstPlayer.name} ต้องเลือกการ์ด 1 ใบเพื่อลงสุสาน`,
+        description: `${firstPlayer.name} ต้องเลือกการ์ด 2 ใบเพื่อลงสุสาน`,
         minSelections: Math.min(2, availableCardIds.length),
         maxSelections: Math.min(2, availableCardIds.length),
         availableCardIds,
@@ -1810,6 +2168,17 @@ function applyCardEffect(room, player, card) {
         return { pending: false };
       }
 
+      const reflected = tryReflectTargetedEffect(room, player, target, "draw_graveyard", { count: 2 });
+      if (reflected.blocked) {
+        addLog(room, buildActionLog(player, card, `${target.name} ข้อความ21`));
+        room.notice = `${target.name} ข้อความ22`;
+        return { pending: false, announceText: `${target.name} ข้อความ22` };
+      }
+      if (reflected.reflected) {
+        addLog(room, buildActionLog(player, card, `ข้อความ23 ${player.name}`));
+        return reflected;
+      }
+
       const drawn = drawFromGraveyard(room, target, 2, { animate: true });
       addLog(room, buildActionLog(player, card, `${target.name} (คนถัดไป) จั่วการ์ด ${drawn} ใบจากสุสาน`));
       room.notice = `${target.name} จั่วการ์ด ${drawn} ใบจากสุสาน`;
@@ -1821,20 +2190,20 @@ function applyCardEffect(room, player, card) {
           effect: "guess_josephine_holder",
           title: "เลือกผู้เล่นที่คุณจะทาย",
           description: "ทายว่าโจเซฟีนกำลังหัวเราะอยู่ในมือของใคร",
-          includeSelf: true,
+          includeSelf: false,
         }),
       };
     case "card_34":
       return {
         pending: beginTargetAction(room, player, card, {
           effect: "swap_hand",
-          title: "เลือกผู้เล่นเพื่อสลับการ์ดทั้งมือ",
+          title: "เลือกผู้เล่นเพื่อสลับการ์ดทั้งมือ­",
           description: "เลือกผู้เล่น 1 คนเพื่อสลับการ์ดทั้งหมดในมือกับคุณ",
         }),
       };
     case "card_35": {
       if (!rotateOtherHands(room, player)) {
-        room.notice = "มีผู้เล่นคนอื่นไม่พอสำหรับสลับมือ";
+        room.notice = "มีผู้เล่นคนอื่นไม่พอสำหรับสลับมือ­";
         addLog(room, buildActionLog(player, card, "มีผู้เล่นไม่พอสำหรับสลับมือ"));
         return { pending: false };
       }
@@ -1850,6 +2219,14 @@ function applyCardEffect(room, player, card) {
       addLog(room, buildActionLog(player, card, "ผู้เล่นทุกคนจั่วการ์ดจากสุสานคนละ 2 ใบ"));
       room.notice = "ทุกคนจั่วการ์ดจากสุสาน";
       return { pending: false };
+    case "card_70":
+    case "card_71":
+      getActivePlayers(room).forEach((target) => {
+        drawCards(room, target, 3, { animate: true });
+      });
+      addLog(room, buildActionLog(player, card, "à¸—à¸¸à¸à¸„à¸™จั่วการ์ด 3 ใบ"));
+      room.notice = "à¸—à¸¸à¸à¸„à¸™จั่วการ์ด 3 ใบ";
+      return { pending: false, announceText: "à¸—à¸¸à¸à¸„à¸™จั่วการ์ด 3 ใบ" };
     case "card_37":
       return {
         pending: beginTargetAction(room, player, card, {
@@ -1860,11 +2237,20 @@ function applyCardEffect(room, player, card) {
       };
     case "card_43":
       player.josephineShield = true;
+      player.josephineShieldPendingWin = true;
       addLog(room, buildActionLog(player, card, "เอฟเฟกต์โจเซฟีนกำลังหัวเราะจะไม่หักคะแนนของตัวเอง"));
       room.notice = `${player.name} เปิดเอฟเฟกต์โจผู้นี้มีความฝันแล้ว`;
       return { pending: false };
+    case "card_81":
+    case "card_82":
+    case "card_83":
+    case "card_84":
+    case "card_85":
+      addLog(room, buildActionLog(player, card, "ข้อความ24"));
+      room.notice = `${player.name} \u0e43\u0e0a\u0e49 ${card.name} \u0e41\u0e15\u0e48\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e2d\u0e30\u0e44\u0e23\u0e43\u0e2b\u0e49\u0e2a\u0e30\u0e17\u0e49\u0e2d\u0e19`;
+      return { pending: false, announceText: `${card.name} \u0e44\u0e23\u0e49\u0e1c\u0e25\u0e43\u0e19\u0e15\u0e2d\u0e19\u0e19\u0e35\u0e49` };
     case "card_49":
-      addLog(room, buildActionLog(player, card, "การ์ดใบนี้ไม่มีเอฟเฟกต์ตอนใช้"));
+      addLog(room, buildActionLog(player, card, "ข้อความ25"));
       room.notice = `${player.name} ใช้ ${card.name}`;
       return { pending: false };
     case "card_50": {
@@ -1901,15 +2287,15 @@ function applyCardEffect(room, player, card) {
     case "card_65": {
       const result = takeCardFromSources(room, "card_02", ["hand", "graveyard", "deck", "banished"]);
       if (!result) {
-        room.notice = "ไม่พบเบธานีเทพหลับให้เรียกขึ้นมือ";
+        room.notice = "ไม่พบเบธานีเทพหลับให้เรียกขึ้นมือ­";
         return { pending: false, announceText: "ไม่พบเบธานีเทพหลับ" };
       }
       receiveCards(room, player, [result.card], { animate: true, source: result.source });
-      addLog(room, buildActionLog(player, card, "เรียกเบธานีเทพหลับขึ้นมือ"));
-      room.notice = `${player.name} เรียกเบธานีเทพหลับขึ้นมือ`;
+      addLog(room, buildActionLog(player, card, "เรียกเบธานีเทพหลับขึ้นมือ­"));
+      room.notice = `${player.name} เรียกเบธานีเทพหลับขึ้นมือ­`;
       return {
         pending: false,
-        announceText: "เบธานีเทพหลับกลับขึ้นมือ",
+        announceText: "เบธานีเทพหลับกลับขึ้นมือ­",
         targetTags: [{ playerId: player.id, text: "🃏+1", tone: "effect-draw effect-draw-green" }],
       };
     }
@@ -1985,11 +2371,11 @@ function applyCardEffect(room, player, card) {
       });
       room.notice = toppedUp.length ? toppedUp.join(", ") : "ไม่มีใครต้องจั่วเพิ่มจากภาษีคนรวย";
       addLog(room, buildActionLog(player, card, toppedUp.length ? toppedUp.join(" / ") : "ไม่มีใครต้องจั่วเพิ่ม"));
-      return { pending: false, announceText: toppedUp.length ? "ภาษีคนรวยทำงาน" : "ไม่มีใครโดนภาษีคนรวย" };
+      return { pending: false, announceText: toppedUp.length ? "ภาษีคนรวยทำงาน" : "ม่มีใครโดนภาษีคนรวย" };
     }
     case "card_105": {
       const previewCards = room.deck.slice(0, 5);
-      const pinkberryCards = previewCards.filter((candidate) => repairText(candidate.name).includes(PINKBERRY_NAME));
+      const pinkberryCards = previewCards.filter((candidate) => repairText(candidate.name).includes("พิงค์เบอร์รี่"));
       if (!pinkberryCards.length) {
         room.deck = shuffle(room.deck);
         room.notice = "5 ใบบนสุดไม่มีการ์ดพิงค์เบอร์รี่";
@@ -2027,7 +2413,7 @@ function applyCardEffect(room, player, card) {
       addCardsToGraveyard(room, dumped, { animate: true });
       const drawn = drawCards(room, player, 1, { animate: true });
       collectIgnoredIds(room, [player.id]);
-      addLog(room, buildActionLog(player, card, `ทิ้งทั้งมือ ${dumped.length} ใบ แล้วจั่วใหม่ ${drawn} ใบ`));
+      addLog(room, buildActionLog(player, card, `ทิ้งทั้งมือ­ ${dumped.length} ใบ แล้วจั่วใหม่ ${drawn} ใบ`));
       room.notice = `${player.name} ทิ้งทั้งมือแล้วจั่วใหม่ 1 ใบ`;
       return {
         pending: false,
@@ -2075,7 +2461,7 @@ function resolvePlayerTargetAction(room, actor, target) {
       return;
     case "link_win_or_lose":
       actor.linkWinLoseTo = target.id;
-      addLog(room, buildActionLog(actor, action.cardName, `จะตามผลแพ้ชนะของ ${target.name}`));
+      addLog(room, buildActionLog(actor, action.cardName, `จะตามผลแพ้ชนะของ‡ ${target.name}`));
       room.notice = `${actor.name} จะตามผลของ ${target.name}`;
       clearPendingAction(room);
       return;
@@ -2102,7 +2488,7 @@ function resolvePlayerTargetAction(room, actor, target) {
         cards: [...target.hand],
       };
       addLog(room, buildActionLog(actor, action.cardName, `เปิดดูการ์ดบนมือของ ${target.name}`));
-      room.notice = `${actor.name} เปิดดูการ์ดของ ${target.name}`;
+      room.notice = `${actor.name} เปิดดูการ์ดบนมือของ ${target.name}`;
       clearPendingAction(room);
       return;
     case "give_two_cards":
@@ -2130,7 +2516,7 @@ function resolvePlayerTargetAction(room, actor, target) {
         minSelections: 1,
         maxSelections: 1,
         requesterId: actor.id,
-        emptyNotice: `${target.name} ไม่มีการ์ดให้มอบ`,
+        emptyNotice: `${target.name} ไม่มีการ์ดให้มอ`,
       })) {
         clearPendingAction(room);
       }
@@ -2168,7 +2554,7 @@ function resolvePlayerTargetAction(room, actor, target) {
       clearPendingAction(room);
       if (playerHasCard(target, "card_15")) {
         settleRound(room, {
-          winnerIds: room.players.map((player) => player.id),
+          winnerIds: [actor.id],
           reason: `${actor.name} ทายถูกว่าโจเซฟีนกำลังหัวเราะอยู่กับ ${target.name}`,
         });
       } else {
@@ -2194,7 +2580,7 @@ function continueSequentialDiscard(room, action) {
       ...action,
       actorId: nextPlayerId,
       availableCardIds: availableCards.map((card) => card.id),
-      description: `${nextPlayer.name} ต้องเลือกการ์ด 1 ใบเพื่อลงสุสาน`,
+      description: `${nextPlayer.name} ต้องเลือกการ์ด 2 ใบเพื่อลงสุสาน`,
       queue: [...action.queue],
     };
     room.notice = `${nextPlayer.name} กำลังเลือกทิ้งการ์ด`;
@@ -2231,7 +2617,7 @@ function resolveCardSelectionAction(room, actor, selectedCardIds) {
       }
 
       receiveCards(room, target, cards, { animate: true, source: "gift" });
-      addLog(room, buildActionLog(actor, action.cardName, `ส่งการ์ด ${cards.length} ใบให้ ${target.name}`));
+      addLog(room, buildActionLog(actor, action.cardName, `ใส่งการ์ด ${cards.length} ใบให้ ${target.name}`));
       room.notice = `${actor.name} ส่งการ์ดให้ ${target.name} แล้ว`;
       return;
     }
@@ -2258,7 +2644,7 @@ function resolveCardSelectionAction(room, actor, selectedCardIds) {
       const target = candidates[Math.floor(Math.random() * candidates.length)];
       const drawn = drawCards(room, target, 1, { animate: true });
       addLog(room, buildActionLog(actor, action.cardName, `${target.name} จั่วการ์ด ${drawn} ใบแบบสุ่ม`));
-      room.notice = `${target.name} ถูกสุ่มให้จั่วการ์ด ${drawn} ใบ`;
+      room.notice = `${target.name} ถูกสุ่มจั่วการ์ด ${drawn} ใบ`;
       return;
     }
     case "sequential_discard_one":
@@ -2274,18 +2660,30 @@ function resolveCardSelectionAction(room, actor, selectedCardIds) {
     case "take_from_deck":
     case "take_from_graveyard":
       receiveCards(room, actor, cards, { animate: true, source: action.selectionSource || "deck" });
-      addLog(room, buildActionLog(actor, action.cardName, `หยิบการ์ด ${cards.length} ใบขึ้นมือ`));
+      addLog(room, buildActionLog(actor, action.cardName, `หยิบการ์ด ${cards.length} ใบขึ้นมือ­`));
       room.notice = `${actor.name} หยิบการ์ดขึ้นมือแล้ว`;
       return;
-    case "take_from_deck_preview": {
-      const previewCards = room.deck.splice(0, Math.min(5, room.deck.length));
+    case "steal_assembly_part": {
+      const pickedCard = cards[0];
+      if (!pickedCard) {
+        room.notice = "\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e01\u0e32\u0e23\u0e4c\u0e14\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01";
+        return;
+      }
+      receiveCards(room, actor, [{ id: pickedCard.id, name: pickedCard.name, desc: pickedCard.desc }], { animate: true, source: "gift" });
+      addLog(room, buildActionLog(actor, action.cardName, `\u0e41\u0e22\u0e48\u0e07 ${pickedCard.name} \u0e21\u0e32\u0e08\u0e32\u0e01 ${pickedCard.ownerName}`));
+      room.notice = `${actor.name} \u0e41\u0e22\u0e48\u0e07 ${pickedCard.name} \u0e21\u0e32\u0e44\u0e14\u0e49\u0e41\u0e25\u0e49\u0e27`;
+      return;
+    }
+    case "take_from_deck_preview":
+    case "take_pinkberry_from_preview": {
+      const previewCards = room.deck.splice(0, Math.min(action.previewCount || 5, room.deck.length));
       const selectedIds = new Set(cards.map((card) => card.id));
       const pickedCards = previewCards.filter((candidate) => selectedIds.has(candidate.id));
       const remainingCards = previewCards.filter((candidate) => !selectedIds.has(candidate.id));
       receiveCards(room, actor, pickedCards, { animate: true, source: "deck" });
       room.deck.push(...remainingCards);
       room.deck = shuffle(room.deck);
-      addLog(room, buildActionLog(actor, action.cardName, `หยิบการ์ดพิงค์เบอร์รี่ ${pickedCards.length} ใบขึ้นมือ`));
+      addLog(room, buildActionLog(actor, action.cardName, `หยิบการ์ดพิงค์เบอร์รี่ ${pickedCards.length} ใบขึ้นมือ­`));
       room.notice = `${actor.name} หยิบการ์ดพิงค์เบอร์รี่ขึ้นมือแล้ว`;
       return;
     }
@@ -2371,6 +2769,9 @@ function pendingActionFor(room, targetId) {
       : Array.isArray(room.pendingAction.availableCardIds)
         ? actor.hand.filter((card) => room.pendingAction.availableCardIds.includes(card.id))
         : actor.hand;
+  const sortedAvailableCards = ["deck", "graveyard", "deck_preview", "player_pool"].includes(room.pendingAction.selectionSource)
+    ? sortCardsByFileId(availableCards)
+    : availableCards;
   return {
     mode: "select_cards",
     effect: room.pendingAction.effect,
@@ -2378,7 +2779,8 @@ function pendingActionFor(room, targetId) {
     description: repairText(room.pendingAction.description),
     minSelections: room.pendingAction.minSelections,
     maxSelections: room.pendingAction.maxSelections,
-    availableCards,
+    selectionSource: room.pendingAction.selectionSource || null,
+    availableCards: sortedAvailableCards,
   };
 }
 
@@ -2401,9 +2803,10 @@ function emitRoomState(roomId) {
       gameStarted: room.gameStarted,
       canStart: room.players[0]?.id === target.id && !room.gameStarted && room.players.length >= 2,
       canNextRound: room.players[0]?.id === target.id && room.gameStarted && room.roundEnded && room.players.length >= 2,
-      canDrawCard: myTurn && !room.pendingAction && !me.turnActionTaken,
-      canEndTurn: myTurn && !room.pendingAction && me.turnActionTaken,
+      canDrawCard: myTurn && !room.pendingAction && (!me.turnActionTaken || !!me.turnKeepOpen),
+      canEndTurn: false,
       turnActionTaken: !!me.turnActionTaken,
+      turnKeepOpen: !!me.turnKeepOpen,
       currentTurnName: getCurrentPlayer(room)?.name || "-",
       myTurn,
       myCardCount: me.hand.length,
@@ -2439,8 +2842,9 @@ function resetRound(room) {
   room.winnerIds = [];
   room.winnerNames = [];
   room.winnerReason = "";
-  room.logs = ["เริ่มรอบใหม่ แจกการ์ดคนละ 5 ใบ"];
+  clearPendingTurnAdvance(room);
   room.resolvedScore = false;
+  room.logs = ["เริ่มรอบใหม่ แจกการ์ดคนละ 5 ใบ"];
   room.notice = "เกมเริ่มแล้ว ให้ผู้เล่นคนแรกเล่นก่อน";
   room.pendingAction = null;
   room.queuedForcedPlays = [];
@@ -2466,11 +2870,13 @@ function resetRound(room) {
     player.skipTurns = 0;
     player.sleepTurns = 0;
     player.josephineShield = false;
+    player.josephineShieldPendingWin = false;
     player.turnCardsUsed = 0;
     player.turnActionTaken = false;
     player.turnDrewCard = false;
     player.turnPlayedCard = false;
     player.turnOverusePenaltyApplied = false;
+    player.turnKeepOpen = false;
     player.saidLastCard = false;
     player.linkWinTo = null;
     player.linkWinLoseTo = null;
@@ -2496,6 +2902,9 @@ function removePlayer(socketId) {
     const [player] = room.players.splice(index, 1);
     addChatMessage(room, "ระบบ", `${player.name} ออกจากห้อง`, true);
     addLog(room, `${player.name} ออกจากห้อง`);
+    if (room.pendingTurnAdvance?.playerId === socketId) {
+      clearPendingTurnAdvance(room);
+    }
 
     if (!room.players.length) {
       delete rooms[roomId];
@@ -2623,7 +3032,10 @@ io.on("connection", (socket) => {
 
     player.saidLastCard = true;
     addLog(room, `${player.name} ตะโกนว่า เอื้อยข่าบ`);
-    room.notice = `${player.name} กดเอื้อยข่าบแล้ว`;
+    room.notice = room.pendingTurnAdvance?.playerId === player.id
+      ? `${player.name} กดเอื้อยข่าบแล้ว รอเปลี่ยนเทิร์น`
+      : `${player.name} กดเอื้อยข่าบแล้ว`;
+    queueEffect(room, { type: "last_card", playerId: player.id });
     emitRoomState(roomId);
   });
 
@@ -2636,7 +3048,8 @@ io.on("connection", (socket) => {
     if (!player || player.id !== socket.id) {
       return socket.emit("errorMsg", "ยังไม่ถึงเทิร์นของคุณ");
     }
-    if (player.turnActionTaken) {
+    const usingExtraAction = consumeKeepOpenTurn(player);
+    if (player.turnActionTaken && !usingExtraAction) {
       return socket.emit("errorMsg", "เทิร์นนี้คุณจั่วหรือใช้การ์ดไปแล้ว");
     }
 
@@ -2651,40 +3064,7 @@ io.on("connection", (socket) => {
       ? `${player.name} จั่วการ์ด 1 ใบแล้ว`
       : `${player.name} พยายามจั่วการ์ด แต่กองเดคหมด`;
     evaluatePlayers(room, room.notice);
-    emitRoomState(roomId);
-  });
-
-  socket.on("endTurn", ({ roomId }) => {
-    const room = rooms[roomId];
-    if (!room || !room.gameStarted || room.roundEnded) return;
-    if (room.pendingAction) return socket.emit("errorMsg", "ต้องเลือกให้เสร็จก่อน");
-
-    const player = getCurrentPlayer(room);
-    if (!player || player.id !== socket.id) {
-      return socket.emit("errorMsg", "ยังไม่ถึงเทิร์นของคุณ");
-    }
-    if (!player.turnActionTaken) {
-      return socket.emit("errorMsg", "คุณต้องลงการ์ด 1 ใบ หรือจั่วการ์ด 1 ใบก่อนจบเทิร์น");
-    }
-
-    if (player.hand.length === 1 && !player.saidLastCard) {
-      const penaltyDrawn = drawCards(room, player, 5, { animate: true });
-      addLog(room, `${player.name} ไม่ได้กดเอื้อยข่าบ จึงโดนจั่วเพิ่ม ${penaltyDrawn} ใบ`);
-      room.notice = `${player.name} โดนลงโทษเพราะไม่ได้กดเอื้อยข่าบ`;
-    }
-
-    evaluatePlayers(room, `${player.name} จบเทิร์น`);
-    if (!room.roundEnded) {
-      room.turnCounter += 1;
-      tickTimedThreats(room);
-    }
-    if (!room.roundEnded) {
-      const previousName = player.name;
-      advanceTurn(room);
-      if (!room.roundEnded && !room.notice.startsWith("ข้ามเทิร์น")) {
-        room.notice = `จบเทิร์นของ ${previousName} แล้ว ถึงตาของ ${getCurrentPlayer(room)?.name || "-"}`;
-      }
-    }
+    maybeAutoAdvanceAfterAction(room, player);
     emitRoomState(roomId);
   });
 
@@ -2710,7 +3090,8 @@ io.on("connection", (socket) => {
     if (!currentPlayer || (currentPlayer.id !== socket.id && !isInterruptCard)) {
       return socket.emit("errorMsg", "ยังไม่ถึงเทิร์นของคุณ");
     }
-    if (currentPlayer.id === socket.id && player.turnActionTaken && !isInterruptCard) {
+    const usingExtraAction = currentPlayer.id === socket.id && consumeKeepOpenTurn(player);
+    if (currentPlayer.id === socket.id && player.turnActionTaken && !usingExtraAction && !isInterruptCard) {
       return socket.emit("errorMsg", "เทิร์นนี้คุณจั่วหรือใช้การ์ดไปแล้ว ให้กดจบเทิร์น");
     }
 
@@ -2726,6 +3107,7 @@ io.on("connection", (socket) => {
 
     if (!effectResult.pending) {
       finalizeResolvedAction(room);
+      maybeAutoAdvanceAfterAction(room, player);
     }
 
     emitRoomState(roomId);
@@ -2749,6 +3131,7 @@ io.on("connection", (socket) => {
     resolvePlayerTargetAction(room, actor, target);
     if (!room.pendingAction && !room.roundEnded) {
       finalizeResolvedAction(room);
+      maybeAutoAdvanceAfterAction(room, actor);
     }
 
     emitRoomState(roomId);
@@ -2770,7 +3153,7 @@ io.on("connection", (socket) => {
 
     const availableIds = new Set(
       room.pendingAction.availableCardIds
-      || (room.pendingAction.availableCardsData || []).map((card) => card.id)
+      || (room.pendingAction.availableCardsData || []).map((card) => card.selectionKey || card.id)
       || actor.hand.map((card) => card.id),
     );
     const valid = uniqueSelected.every((cardId) => availableIds.has(cardId));
@@ -2779,6 +3162,7 @@ io.on("connection", (socket) => {
     resolveCardSelectionAction(room, actor, uniqueSelected);
     if (!room.pendingAction && !room.roundEnded) {
       finalizeResolvedAction(room);
+      maybeAutoAdvanceAfterAction(room, actor);
     }
 
     emitRoomState(roomId);

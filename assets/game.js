@@ -1,4 +1,4 @@
-const socket = io();
+﻿const socket = io();
 const roomId = new URLSearchParams(window.location.search).get("room");
 const playerName = localStorage.getItem("playerName");
 
@@ -80,7 +80,6 @@ const SOUND_VOLUMES = {
 };
 
 const drawBtn = document.getElementById("drawBtn");
-const endTurnBtn = document.getElementById("endTurnBtn");
 const startBtn = document.getElementById("startBtn");
 const callLastCardBtn = document.getElementById("callLastCardBtn");
 const myTurnBanner = document.getElementById("myTurnBanner");
@@ -152,7 +151,6 @@ function hydrateStaticText() {
   document.title = "สงครามโคตรเสียว";
   myTurnBanner.textContent = "ถึงตาคุณแล้ว";
   drawBtn.textContent = "จั่วการ์ด 1 ใบ";
-  endTurnBtn.textContent = "จบเทิร์น";
   callLastCardBtn.textContent = "เอื้อยข่าบ";
   startBtn.textContent = "เริ่มเกม";
   document.getElementById("openGuideModalBtn").textContent = "คำแนะนำ";
@@ -186,24 +184,170 @@ function hydrateStaticText() {
   if (stackLabel) stackLabel.textContent = "เดค";
   if (centerLabel) centerLabel.textContent = "การ์ดที่ถูกใช้งานล่าสุด";
   if (graveLabel) graveLabel.textContent = "สุสาน";
+
+  const musicLabel = document.querySelector('.music-widget label');
+  if (musicLabel) musicLabel.textContent = "เพลง";
+  const roundStatus = document.getElementById("roundStatus");
+  const turnStatus = document.getElementById("turnStatus");
+  const noticeBox = document.getElementById("noticeBox");
+  if (roundStatus) roundStatus.textContent = "กำลังเชื่อมต่อ...";
+  if (turnStatus) turnStatus.textContent = "กำลังเชื่อมต่อ...";
+  if (noticeBox) noticeBox.textContent = "กำลังเชื่อมต่อข้อมูลห้อง...";
+
+  const modalTitles = {
+    chatModalTitle: "แชทห้อง",
+    targetModalTitle: "เลือกผู้เล่น",
+    inspectModalTitle: "การ์ดที่เปิดดู",
+    cardSelectModalTitle: "เลือกการ์ด",
+    overflowHandModalTitle: "การ์ดที่ซ่อนอยู่ในมือ",
+  };
+  Object.entries(modalTitles).forEach(([id, text]) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = text;
+  });
+
+  const graveyardHead = document.querySelector("#graveyardModal .modal-head strong");
+  if (graveyardHead) graveyardHead.textContent = "การ์ดในสุสาน";
+  const logHead = document.querySelector("#logModal .modal-head strong");
+  if (logHead) logHead.textContent = "พิธีกรข้างสนาม";
+  const guideHead = document.querySelector("#guideModal .modal-head strong");
+  if (guideHead) guideHead.textContent = "คำแนะนำการเล่นเกม";
+
+  const targetDesc = document.getElementById("targetModalDescription");
+  if (targetDesc) targetDesc.textContent = "เลือกผู้เล่นที่ต้องการ";
+  const inspectDesc = document.getElementById("inspectModalDescription");
+  if (inspectDesc) inspectDesc.textContent = "กำลังดูการ์ดในมือของผู้เล่น";
+  const selectDesc = document.getElementById("cardSelectModalDescription");
+  if (selectDesc) selectDesc.textContent = "เลือกการ์ดที่ต้องการ";
+  const selectCounter = document.getElementById("cardSelectModalCounter");
+  if (selectCounter) selectCounter.textContent = "เลือกแล้ว 0 ใบ";
+  if (overflowHandModalDescription) {
+    overflowHandModalDescription.textContent = "การ์ดที่เกินจาก 10 ใบจะถูกรวมไว้ตรงนี้";
+  }
+
+  if (chatInput) {
+    chatInput.placeholder = "พิมพ์ข้อความคุยกับเพื่อนในห้อง";
+  }
+  if (cardTooltipImage) {
+    cardTooltipImage.alt = "การ์ดที่กำลังดู";
+  }
+
+  const guideCopy = document.querySelector(".guide-copy");
+  if (guideCopy) {
+    guideCopy.innerHTML = `
+      <p><strong>วิธีการเล่นเกม</strong> เกมนี้เป็นเกมแบบ Turn-Base</p>
+      <p><strong>เป้าหมายของเกม:</strong> ใครการ์ดหมดมือก่อนเป็นคนชนะ หรือชนะทันทีตามเงื่อนไขพิเศษบนหน้าการ์ด</p>
+      <p>ทุกคนจะได้รับการ์ดคนละ 5 ใบในมือ</p>
+      <p>ดูที่มุมขวา ซ้าย และบน จะเห็นว่าการ์ดของเพื่อนเหลือกันคนละกี่ใบ</p>
+      <p>ตาใครเล่น จะมีแสงสีเขียวขึ้นรอบชื่อของคนนั้น และจะมีแจ้งเตือนว่าถึงตาคุณแล้วตรงกลางจอ มุมขวาล่างจะบอกว่าตอนนี้ถึงตาของใคร</p>
+      <p><strong>การเล่นในแต่ละตา</strong></p>
+      <p>เลือกการ์ดในมือแล้วกดค้าง เพื่อลากลงสนาม การ์ดที่ลงจะไปอยู่ที่กองกลาง</p>
+      <p>การ์ดแต่ละใบมีความสามารถ ก่อนลงให้กดค้างที่การ์ดเพื่ออ่านความสามารถ เช่น แกล้งเพื่อนให้จั่วเพิ่ม หรือป้องกันตัวเอง</p>
+      <p>เมื่อลงการ์ดเสร็จ หรือจั่วการ์ดแล้ว เทิร์นจะสลับไปของเพื่อนคนถัดไปอัตโนมัติ</p>
+      <p>ถ้าเหลือการ์ด 1 ใบ ให้กดปุ่มเอื้อยข่าบก่อนจบเทิร์น ไม่งั้นจะถูกลงโทษ</p>
+    `;
+  }
 }
 
 function repairText(value) {
   if (typeof value !== "string") return value;
-  if (!/[ÃàÂ]/.test(value)) return value;
+  if (!/[ÃƒÃ Ã‚]/.test(value)) return value;
 
   let fixed = value;
   for (let count = 0; count < 2; count += 1) {
     try {
       const candidate = decodeURIComponent(escape(fixed));
-      if (!candidate || candidate.includes("�")) break;
+      if (!candidate || candidate.includes("ï¿½")) break;
       fixed = candidate;
-      if (!/[ÃàÂ]/.test(fixed)) break;
+      if (!/[ÃƒÃ Ã‚]/.test(fixed)) break;
     } catch (_error) {
       break;
     }
   }
   return fixed;
+}
+
+function repairText(value) {
+  if (typeof value !== "string") return value;
+  if (!value) return value;
+  if (/[\u0E00-\u0E7F]/.test(value) && !/(?:Ã|Â|à¸|à¹|àº|ï¿½|�|ðŸ|â)/.test(value)) return value;
+  if (/^[\x00-\x7F]*$/.test(value)) return value;
+
+  const scoreText = (text) => {
+    const thai = (text.match(/[\u0E00-\u0E7F]/g) || []).length;
+    const mojibake = (text.match(/(?:Ã|Â|à¸|à¹|àº|ï¿½)/g) || []).length;
+    const replacement = (text.match(/�/g) || []).length;
+    return (thai * 4) - (mojibake * 3) - (replacement * 6);
+  };
+
+  let fixed = value;
+  let best = value;
+  let bestScore = scoreText(value);
+  for (let count = 0; count < 3; count += 1) {
+    try {
+      const candidate = decodeURIComponent(escape(fixed));
+      if (!candidate || candidate === fixed) break;
+      const candidateScore = scoreText(candidate);
+      if (candidateScore > bestScore) {
+        best = candidate;
+        bestScore = candidateScore;
+      }
+      fixed = candidate;
+      if (/[\u0E00-\u0E7F]/.test(candidate) && !/(?:Ã|Â|à¸|à¹|àº|ï¿½)/.test(candidate)) break;
+    } catch (_error) {
+      break;
+    }
+  }
+  return best;
+}
+
+function repairText(value) {
+  if (typeof value !== "string") return value;
+  if (!value) return value;
+  if (/[\u0E00-\u0E7F]/.test(value) && !/(?:Ã|Â|à¸|à¹|àº|ï¿½|�|ðŸ|â)/.test(value)) return value;
+  if (/^[\x00-\x7F]*$/.test(value)) return value;
+
+  const cp1252Map = {
+    0x20AC: 0x80, 0x201A: 0x82, 0x0192: 0x83, 0x201E: 0x84, 0x2026: 0x85,
+    0x2020: 0x86, 0x2021: 0x87, 0x02C6: 0x88, 0x2030: 0x89, 0x0160: 0x8A,
+    0x2039: 0x8B, 0x0152: 0x8C, 0x017D: 0x8E, 0x2018: 0x91, 0x2019: 0x92,
+    0x201C: 0x93, 0x201D: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+    0x02DC: 0x98, 0x2122: 0x99, 0x0161: 0x9A, 0x203A: 0x9B, 0x0153: 0x9C,
+    0x017E: 0x9E, 0x0178: 0x9F,
+  };
+
+  const encodeCp1252 = (text) => new Uint8Array(
+    [...text].map((char) => {
+      const code = char.charCodeAt(0);
+      if (code <= 0xFF) return code;
+      return cp1252Map[code] ?? 0x3F;
+    }),
+  );
+  const scoreText = (text) => {
+    const thai = (text.match(/[\u0E00-\u0E7F]/g) || []).length;
+    const mojibake = (text.match(/(?:Ã|Â|à¸|à¹|àº|ï¿½|�)/g) || []).length;
+    return (thai * 4) - (mojibake * 3);
+  };
+
+  let fixed = value;
+  let best = value;
+  let bestScore = scoreText(value);
+  for (let count = 0; count < 4; count += 1) {
+    try {
+      const candidate = new TextDecoder("utf-8").decode(encodeCp1252(fixed));
+      if (!candidate || candidate === fixed) break;
+      const candidateScore = scoreText(candidate);
+      if (candidateScore > bestScore) {
+        best = candidate;
+        bestScore = candidateScore;
+      }
+      fixed = candidate;
+      if (/[\u0E00-\u0E7F]/.test(candidate) && !/(?:Ã|Â|à¸|à¹|àº|ï¿½|�)/.test(candidate)) break;
+    } catch (_error) {
+      break;
+    }
+  }
+  return best;
 }
 
 function normalizeCard(card) {
@@ -440,10 +584,26 @@ function clearSpecialWinnerAnimation() {
 
 function isPinkAssemblyWinner(reason) {
   const text = repairText(reason || "");
-  return text.includes("รวบรวมหัว แขน และขา") && text.includes("พิงค์เบอร์รี่");
+  return text.includes("à¸£à¸§à¸šà¸£à¸§à¸¡à¸«à¸±à¸§ à¹à¸‚à¸™ à¹à¸¥à¸°à¸‚à¸²") && text.includes("à¸žà¸´à¸‡à¸„à¹Œà¹€à¸šà¸­à¸£à¹Œà¸£à¸µà¹ˆ");
 }
 
 /*
+function isPinkLegendaryWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("Ã Â¸Å¾Ã Â¸Â´Ã Â¸â€¡Ã Â¸â€žÃ Â¹Å’Ã Â¹â‚¬Ã Â¸Å¡Ã Â¸Â­Ã Â¸Â£Ã Â¹Å’Ã Â¸Â£Ã Â¸ÂµÃ Â¹Ë†Ã Â¹â‚¬Ã Â¸â€”Ã Â¸Å¾Ã Â¸â€¹Ã Â¹Ë†Ã Â¸Â²") && text.includes("Ã Â¸Å Ã Â¸â„¢Ã Â¸Â°Ã Â¸â€”Ã Â¸Â±Ã Â¸â„¢Ã Â¸â€”Ã Â¸Âµ");
+}
+
+function isZeroWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("Ã Â¸â€¹Ã Â¸ÂµÃ Â¹â€šÃ Â¸Â£Ã Â¹Ë†Ã Â¹â‚¬Ã Â¸â€”Ã Â¸Å¾Ã Â¸Ë†Ã Â¸Â¸Ã Â¸â€¢Ã Â¸Â´Ã Â¸Â¡Ã Â¸Â²Ã Â¹â‚¬Ã Â¸ÂÃ Â¸Â´Ã Â¸â€) && text.includes("3 Ã Â¸â€žÃ Â¸Â£Ã Â¸Â±Ã Â¹â€°Ã Â¸â€¡");
+}
+
+function isValeskaWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("Ã Â¸Â§Ã Â¸Â²Ã Â¹â‚¬Ã Â¸Â¥Ã Â¸ÂªÃ Â¸ÂÃ Â¹â€°Ã Â¸Â²Ã Â¸Å“Ã Â¸Â¹Ã Â¹â€°Ã Â¸Â¡Ã Â¸Â±Ã Â¹Ë†Ã Â¸â€¡Ã Â¸â€žÃ Â¸Â±Ã Â¹Ë†Ã Â¸â€¡");
+}
+
+*/
 function isPinkLegendaryWinner(reason) {
   const text = repairText(reason || "");
   return text.includes("à¸žà¸´à¸‡à¸„à¹Œà¹€à¸šà¸­à¸£à¹Œà¸£à¸µà¹ˆà¹€à¸—à¸žà¸‹à¹ˆà¸²") && text.includes("à¸Šà¸™à¸°à¸—à¸±à¸™à¸—à¸µ");
@@ -451,28 +611,12 @@ function isPinkLegendaryWinner(reason) {
 
 function isZeroWinner(reason) {
   const text = repairText(reason || "");
-  return text.includes("à¸‹à¸µà¹‚à¸£à¹ˆà¹€à¸—à¸žà¸ˆà¸¸à¸•à¸´à¸¡à¸²à¹€à¸à¸´à¸”) && text.includes("3 à¸„à¸£à¸±à¹‰à¸‡");
+  return text.includes("à¸‹à¸µà¹‚à¸£à¹ˆà¹€à¸—à¸žà¸ˆà¸¸à¸•à¸´à¸¡à¸²à¹€à¸à¸´à¸”") && text.includes("3 à¸„à¸£à¸±à¹‰à¸‡");
 }
 
 function isValeskaWinner(reason) {
   const text = repairText(reason || "");
   return text.includes("à¸§à¸²à¹€à¸¥à¸ªà¸à¹‰à¸²à¸œà¸¹à¹‰à¸¡à¸±à¹ˆà¸‡à¸„à¸±à¹ˆà¸‡");
-}
-
-*/
-function isPinkLegendaryWinner(reason) {
-  const text = repairText(reason || "");
-  return text.includes("พิงค์เบอร์รี่เทพซ่า") && text.includes("ชนะทันที");
-}
-
-function isZeroWinner(reason) {
-  const text = repairText(reason || "");
-  return text.includes("ซีโร่เทพจุติมาเกิด") && text.includes("3 ครั้ง");
-}
-
-function isValeskaWinner(reason) {
-  const text = repairText(reason || "");
-  return text.includes("วาเลสก้าผู้มั่งคั่ง");
 }
 
 function isBethanyWinner(reason) {
@@ -484,11 +628,59 @@ function showWinnerOverlayContent(winnerNamesText, winnerReason, overlayKey, opt
   if (options.playSound) {
     playSound("victory");
   }
-  winnerOverlayTitle.textContent = "à¹€à¸à¸¡à¸ˆà¸šà¹à¸¥à¹‰à¸§ à¸¢à¸´à¸™à¸”à¸µà¸”à¹‰à¸§à¸¢ à¸œà¸¹à¹‰à¸Šà¸™à¸°à¸„à¸·à¸­";
+  winnerOverlayTitle.textContent = "Ã Â¹â‚¬Ã Â¸ÂÃ Â¸Â¡Ã Â¸Ë†Ã Â¸Å¡Ã Â¹ÂÃ Â¸Â¥Ã Â¹â€°Ã Â¸Â§ Ã Â¸Â¢Ã Â¸Â´Ã Â¸â„¢Ã Â¸â€Ã Â¸ÂµÃ Â¸â€Ã Â¹â€°Ã Â¸Â§Ã Â¸Â¢ Ã Â¸Å“Ã Â¸Â¹Ã Â¹â€°Ã Â¸Å Ã Â¸â„¢Ã Â¸Â°Ã Â¸â€žÃ Â¸Â·Ã Â¸Â­";
   renderAnimatedWinnerText(winnerOverlayName, winnerNamesText);
   winnerOverlayReason.textContent = winnerReason;
   winnerOverlay.classList.remove("hidden");
   requestAnimationFrame(() => winnerOverlay.classList.add("show"));
+}
+
+function isPinkLegendaryWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("à¸žà¸´à¸‡à¸„à¹Œà¹€à¸šà¸­à¸£à¹Œà¸£à¸µà¹ˆà¹€à¸—à¸žà¸‹à¹ˆà¸²") && text.includes("à¸Šà¸™à¸°à¸—à¸±à¸™à¸—à¸µ");
+}
+
+function isZeroWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("à¸‹à¸µà¹‚à¸£à¹ˆà¹€à¸—à¸žà¸ˆà¸¸à¸•à¸´à¸¡à¸²à¹€à¸à¸´à¸”") && text.includes("3 à¸„à¸£à¸±à¹‰à¸‡");
+}
+
+function isValeskaWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("à¸§à¸²à¹€à¸¥à¸ªà¸à¹‰à¸²à¸œà¸¹à¹‰à¸¡à¸±à¹ˆà¸‡à¸„à¸±à¹ˆà¸‡");
+}
+
+function isBethanyWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("\u0e40\u0e1a\u0e18\u0e32\u0e19\u0e35\u0e40\u0e17\u0e1e\u0e2b\u0e25\u0e31\u0e1a") && text.includes("\u0e04\u0e23\u0e1a 3 \u0e04\u0e23\u0e31\u0e49\u0e07");
+}
+function isDreamWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("à¹‚à¸ˆà¸œà¸¹à¹‰à¸™à¸µà¹‰à¸¡à¸µà¸„à¸§à¸²à¸¡à¸à¸±à¸™")
+    || text.includes("à¹‚à¸ˆà¹€à¸‹à¸Ÿà¸µà¸™à¸à¸³à¸¥à¸±à¸‡à¸«à¸±à¸§à¹€à¸£à¸²à¸°à¸‚à¸“à¸°à¸¡à¸µà¹‚à¸ˆà¸œà¸¹à¹‰à¸™à¸µà¹‰à¸¡à¸µà¸„à¸§à¸²à¸¡à¸à¸±à¸™")
+    || (text.includes("à¹‚à¸ˆà¹€à¸‹à¸Ÿà¸µà¸™à¸à¸³à¸¥à¸±à¸‡à¸«à¸±à¸§à¹€à¸£à¸²à¸°") && text.includes("à¸Šà¸™à¸°à¸—à¸±à¸™à¸—à¸µ"));
+}
+
+function isJapinkWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("à¸—à¸²à¸¢à¸–à¸¹à¸à¸§à¹ˆà¸²à¹‚à¸ˆà¹€à¸‹à¸Ÿà¸µà¸™à¸à¸³à¸¥à¸±à¸‡à¸«à¸±à¸§à¹€à¸£à¸²à¸°");
+}
+
+function showWinnerOverlayContent(winnerNamesText, winnerReason, overlayKey, options = {}) {
+  state.winnerOverlayKey = overlayKey;
+  if (options.playSound) {
+    playSound("victory");
+  }
+  winnerOverlayTitle.textContent = "เกมจบแล้ว ยินดีด้วย ผู้ชนะคือ";
+  renderAnimatedWinnerText(winnerOverlayName, winnerNamesText);
+  winnerOverlayReason.textContent = winnerReason;
+  winnerOverlay.classList.remove("hidden");
+  requestAnimationFrame(() => winnerOverlay.classList.add("show"));
+}
+
+function isPinkAssemblyWinner(reason) {
+  const text = repairText(reason || "");
+  return text.includes("รวบรวมหัว แขน และขา") && text.includes("พิงค์เบอร์รี่");
 }
 
 function isPinkLegendaryWinner(reason) {
@@ -508,8 +700,9 @@ function isValeskaWinner(reason) {
 
 function isBethanyWinner(reason) {
   const text = repairText(reason || "");
-  return text.includes("\u0e40\u0e1a\u0e18\u0e32\u0e19\u0e35\u0e40\u0e17\u0e1e\u0e2b\u0e25\u0e31\u0e1a") && text.includes("\u0e04\u0e23\u0e1a 3 \u0e04\u0e23\u0e31\u0e49\u0e07");
+  return text.includes("เบธานีเทพหลับ") && text.includes("ครบ 3 ครั้ง");
 }
+
 function isDreamWinner(reason) {
   const text = repairText(reason || "");
   return text.includes("โจผู้นี้มีความฝัน")
@@ -749,7 +942,7 @@ async function runPinkAssemblyWinnerAnimation(roomState, overlayKey, winnerNames
   }, 320);
 
   state.winnerOverlayKey = overlayKey;
-  winnerOverlayTitle.textContent = "เกมจบแล้ว ยินดีด้วย ผู้ชนะคือ";
+  winnerOverlayTitle.textContent = "à¹€à¸à¸¡à¸ˆà¸šà¹à¸¥à¹‰à¸§ à¸¢à¸´à¸™à¸”à¸µà¸”à¹‰à¸§à¸¢ à¸œà¸¹à¹‰à¸Šà¸™à¸°à¸„à¸·à¸­";
   renderAnimatedWinnerText(winnerOverlayName, winnerNames.join(", "));
   winnerOverlayReason.textContent = winnerReason;
   winnerOverlay.classList.remove("hidden");
@@ -1172,7 +1365,7 @@ function canPlayCard(roomState, card) {
   if (!roomState || !card) return false;
   if (roomState.roundEnded || roomState.pendingAction || roomState.eliminated) return false;
   if (card.cannotBeUsed) return false;
-  return (roomState.myTurn && !roomState.turnActionTaken) || card.id === "card_13";
+  return (roomState.myTurn && (!roomState.turnActionTaken || roomState.turnKeepOpen)) || card.id === "card_13";
 }
 
 function handleCardPointerDown(event, card, element) {
@@ -1331,16 +1524,16 @@ function renderOverflowHandModal(cards) {
 
   overflowHandModalCards.innerHTML = "";
   if (overflowHandModalTitle) {
-    overflowHandModalTitle.textContent = "การ์ดที่ซ้อนอยู่ในมือ";
+    overflowHandModalTitle.textContent = "การ์ดที่ซ่อนอยู่ในมือ";
   }
   if (overflowHandModalDescription) {
     overflowHandModalDescription.textContent = state.overflowHandCards.length
-      ? `มีการ์ดที่ซ้อนอยู่ ${state.overflowHandCards.length} ใบ`
-      : "ตอนนี้ยังไม่มีการ์ดที่ซ้อนอยู่ในมือ";
+      ? `มีการ์ดที่ซ่อนอยู่ ${state.overflowHandCards.length} ใบ`
+      : "ตอนนี้ยังไม่มีการ์ดที่ซ่อนอยู่ในมือ";
   }
 
   if (!state.overflowHandCards.length) {
-    overflowHandModalCards.innerHTML = '<div class="empty-box">ตอนนี้ยังไม่มีการ์ดที่ซ้อนอยู่ในมือ</div>';
+    overflowHandModalCards.innerHTML = '<div class="empty-box">ตอนนี้ยังไม่มีการ์ดที่ซ่อนอยู่ในมือ</div>';
     return;
   }
 
@@ -1449,7 +1642,7 @@ function getPendingActionKey(action) {
   if (action.mode === "select_player") {
     return `${action.mode}:${action.effect}:${(action.options || []).map((option) => option.id).join(",")}`;
   }
-  return `${action.mode}:${action.effect}:${(action.availableCards || []).map((card) => card.id).join(",")}:${action.minSelections}:${action.maxSelections}`;
+  return `${action.mode}:${action.effect}:${(action.availableCards || []).map((card) => card.selectionKey || card.id).join(",")}:${action.minSelections}:${action.maxSelections}`;
 }
 
 function isSelectionValid(action) {
@@ -1497,14 +1690,15 @@ function renderCardSelectionAction(action) {
     action.availableCards.forEach((card) => {
       const item = document.createElement("button");
       item.type = "button";
-      item.className = `selectable-card ${state.selectedCardIds.includes(card.id) ? "selected" : ""}`.trim();
+      const selectionId = card.selectionKey || card.id;
+      item.className = `selectable-card ${state.selectedCardIds.includes(selectionId) ? "selected" : ""}`.trim();
       item.appendChild(createCardImage(card, { small: true }));
 
       const name = document.createElement("div");
       name.className = "modal-card-name";
       name.textContent = card.name;
       item.appendChild(name);
-      item.addEventListener("click", () => toggleSelectedCard(card.id));
+      item.addEventListener("click", () => toggleSelectedCard(selectionId));
       cardSelectModalCards.appendChild(item);
     });
   }
@@ -1792,6 +1986,13 @@ function renderEffects(roomState) {
       return;
     }
 
+    if (effect.type === "last_card") {
+      playSound("lastCard");
+      const rect = getAnchorRectForPlayer(roomState, effect.playerId);
+      spawnFloatingEffect(rect, "เอื้อยข่าบ!", "effect-announce");
+      return;
+    }
+
     if (effect.type === "announce") {
       const anchor = document.querySelector(".center-card") || document.querySelector(".center-table");
       if (anchor) {
@@ -1962,7 +2163,6 @@ function updateActionButtons(roomState) {
   startBtn.textContent = roomState.canNextRound ? "เริ่มรอบใหม่" : "เริ่มเกม";
 
   drawBtn.disabled = !roomState.canDrawCard || actionLocked || roomState.eliminated;
-  endTurnBtn.disabled = !roomState.canEndTurn || actionLocked || roomState.eliminated;
 
   const shouldShowCallButton = roomState.gameStarted
     && !roomState.roundEnded
@@ -1997,9 +2197,7 @@ function updateActionButtons(roomState) {
   };
 
   drawBtn.onclick = () => socket.emit("drawOne", { roomId });
-  endTurnBtn.onclick = () => socket.emit("endTurn", { roomId });
   callLastCardBtn.onclick = () => {
-    playSound("lastCard");
     socket.emit("sayLastCard", { roomId });
   };
 }
@@ -2307,3 +2505,4 @@ chatInput.addEventListener("keydown", (event) => {
     sendChatMessage();
   }
 });
+
